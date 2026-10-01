@@ -1,10 +1,11 @@
-# Wraps the upstream prebuilt aarch64 openhuman-core binary in the same runtime
-# image upstream uses, so no Rust build is needed on the VM.
-FROM debian:bookworm-slim
+# Wraps the upstream prebuilt aarch64 openhuman-core binary so no Rust build is
+# needed on the VM. The upstream tarball is linked against glibc 2.39, so the
+# base must be Ubuntu 24.04 (Debian bookworm's 2.36 fails at exec).
+FROM ubuntu:24.04
 ARG OPENHUMAN_VERSION
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates libssl3 libasound2 libxdo3 libxtst6 libx11-6 libevdev2 curl gosu \
+    ca-certificates libssl3t64 libasound2t64 libxdo3 libxtst6 libx11-6 libevdev2 curl gosu \
     && rm -rf /var/lib/apt/lists/*
 RUN groupadd --gid 10001 openhuman \
  && useradd --uid 10001 --gid 10001 --create-home --shell /bin/bash openhuman \

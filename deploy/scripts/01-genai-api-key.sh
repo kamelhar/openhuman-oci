@@ -6,6 +6,8 @@ COMP="$(tfout compartment_id)"
 SECRET_ID="$(tfjson secret_ids | jq -r .genai_api_key)"
 MODEL="$(tfjson genai | jq -r .chat_model)"
 NAME="${1:-openhuman-core-$(date +%Y%m%d)}"
+EXPIRY_DAYS="${EXPIRY_DAYS:-365}"
+EXPIRY=$(python3 -c "import datetime as d; print((d.datetime.now(d.timezone.utc)+d.timedelta(days=$EXPIRY_DAYS)).strftime('%Y-%m-%dT%H:%M:%SZ'))")
 
 echo "checking model '$MODEL' exists in $REGION ..."
 if ! oci generative-ai model-collection list-models --compartment-id "$COMP" --profile "$PROFILE" --region "$REGION" \
@@ -15,8 +17,8 @@ fi
 
 echo "creating GenAI API key '$NAME' in $REGION ..."
 RESP=$(oci generative-ai api-key create --compartment-id "$COMP" --display-name "$NAME" \
-        --key-details '[{"keyName":"key-one"},{"keyName":"key-two"}]' \
-        --profile "$PROFILE" --region "$REGION" --wait-for-state ACTIVE 2>/dev/null)
+        --key-details "[{\"keyName\":\"key-one\",\"timeExpiry\":\"$EXPIRY\"},{\"keyName\":\"key-two\",\"timeExpiry\":\"$EXPIRY\"}]" \
+        --profile "$PROFILE" --region "$REGION")
 echo "$RESP" | jq -c '.data | {id, "display-name", "lifecycle-state", keys: [.keys[]? | {"key-name", "key-mask", state}]}'
 
 # The secret material (ApiKeyItem.key) is only returned by the create call.

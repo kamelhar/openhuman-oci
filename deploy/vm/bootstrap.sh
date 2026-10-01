@@ -52,11 +52,12 @@ fi
 "$BASE/venv/bin/pip" install --quiet --upgrade pip oci tomli-w requests
 
 # ---- core image from the upstream release tarball ---------------------------
-if ! docker image inspect "openhuman-core:${OPENHUMAN_VERSION}" >/dev/null 2>&1; then
-  log "building openhuman-core:${OPENHUMAN_VERSION}"
-  docker build --build-arg "OPENHUMAN_VERSION=${OPENHUMAN_VERSION}" -t "openhuman-core:${OPENHUMAN_VERSION}" -f "$BASE/Dockerfile.core" "$BASE"
+IMG_TAG="${OPENHUMAN_VERSION}-$(sha256sum "$BASE/Dockerfile.core" | cut -c1-8)"
+if ! docker image inspect "openhuman-core:${IMG_TAG}" >/dev/null 2>&1; then
+  log "building openhuman-core:${IMG_TAG}"
+  docker build --build-arg "OPENHUMAN_VERSION=${OPENHUMAN_VERSION}" -t "openhuman-core:${IMG_TAG}" -f "$BASE/Dockerfile.core" "$BASE"
 fi
-docker tag "openhuman-core:${OPENHUMAN_VERSION}" openhuman-core:local
+docker tag "openhuman-core:${IMG_TAG}" openhuman-core:local
 
 # ---- first render of secrets + config (creates core.env) --------------------
 "$BASE/venv/bin/python" "$BASE/render_config.py" --no-restart || log "WARN first render failed (secrets may not be ready yet); timer will retry"

@@ -179,6 +179,12 @@ variable "mcp_refresh_token_expiry_seconds" {
   default = 86400
 }
 
+variable "bastion_client_cidrs" {
+  description = "CIDRs allowed to open bastion sessions. Defaults to allowed_client_cidrs. Set wider if your SSH egress IP differs from your HTTPS egress IP (split-tunnel VPNs); sessions are still key-authenticated."
+  type        = list(string)
+  default     = []
+}
+
 variable "enable_bastion" {
   description = "Create an OCI Bastion for admin access to the private subnet."
   type        = bool
