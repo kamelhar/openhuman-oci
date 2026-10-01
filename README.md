@@ -1,0 +1,46 @@
+# openhuman-oci
+
+Reference architecture for running [OpenHuman](https://github.com/tinyhumansai/openhuman)
+on Oracle Cloud Infrastructure, with OCI Generative AI as the model provider and
+Oracle AI Database reached through Oracle's managed MCP servers.
+
+## What OpenHuman is
+
+OpenHuman is an open-source (GPL-3.0) personal AI assistant from TinyHumans. It
+is three things in one Rust binary:
+
+1. **A memory.** It pulls your email, chat, docs, calendar and code through 118+
+   OAuth integrations every twenty minutes, normalises everything to Markdown,
+   chunks and scores it, and folds it into per-source / per-topic / per-day
+   summary trees stored in SQLite and mirrored as an Obsidian vault you can edit.
+2. **An orchestrator.** Agents run on durable graphs (tinyagents / tinyflows):
+   they checkpoint, pause for approval, resume, spawn sub-agent fleets three
+   levels deep, and leave replayable run journals. A fast reflex agent triages;
+   a reasoning core does multi-step work.
+3. **A researcher.** Native tools for web search, browser and computer control,
+   coding, voice, scheduling, plus any MCP server or skill from the public
+   registries. It also reaches you over Slack, Telegram, email and other
+   channels, so it works while the desktop app is closed.
+
+The desktop app (Tauri + React) is a shell. All logic lives in `openhuman-core`,
+which also ships as a headless container, a CLI, a TUI, an embeddable Rust
+library and a read-only MCP server. This repository is about deploying that core
+on OCI.
+
+## Repository layout
+
+| Path | Contents |
+| --- | --- |
+| `docs/ARCHITECTURE.md` | The reference architecture: deployment shapes, OCI service mapping, security posture, known gaps, phased plan |
+| `docs/UPSTREAM.md` | Where OCI-related work should land upstream in the TinyHumans repos, and their contribution rules |
+| `deploy/` | OCI deployment assets (Terraform / Resource Manager stack, container recipes). Empty until phase 1 starts |
+
+## Status
+
+Research and design. No OCI resources have been created from this repo yet.
+
+## Privacy
+
+Nothing in this repo may contain tenancy or compartment OCIDs, local OCI profile
+names, account holder names, or credentials. Use placeholders and read secrets
+from the environment or OCI Vault.
