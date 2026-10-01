@@ -62,6 +62,19 @@ Build the reference architecture as Shape A now. Keep every OCI component
 identical for both shapes so the move to B is a container image swap, not a
 redesign. Treat B as the enterprise target.
 
+### Pilot decisions (2026-10-01)
+
+The first deployment in `deploy/` narrows Shape A to what fits Always Free:
+
+| Topic | Reference design | Pilot |
+| --- | --- | --- |
+| Compute | OKE or Container Instances, one core per user | One Ampere A1 VM (3 OCPU / 18 GB) running Docker Compose. Same container, same workspace layout, so moving to OKE later is a manifest change |
+| Core image | Upstream amd64 image | Upstream ships a prebuilt `aarch64` core tarball with each release. The VM wraps it in the upstream runtime image at boot. No Rust build, no registry |
+| Chat inference | LiteLLM gateway with resource-principal signing | OpenHuman calls the OCI GenAI OpenAI-compatible endpoint directly with a GenAI API key from Vault. LiteLLM is deferred: its proxy cannot use instance principals from config, so it would need a user API key too |
+| Embeddings | Via the gateway (Cohere embed on OCI) | Ollama `bge-m3` on the VM. Free, local, upstream's recommended embedder |
+| Client path | Load balancer with path allowlist | Same. Public flexible LB restricted to the operator's CIDR, generated CA, allowlist `/rpc`, `/health`, `/events` |
+| Database access | Database Tools MCP Server | Same. Resource-principal server and connection, ADB over TLS with a VCN access list through a Database Tools private endpoint |
+
 ## 2. Component mapping
 
 ```

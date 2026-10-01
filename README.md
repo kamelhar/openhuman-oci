@@ -33,11 +33,14 @@ on OCI.
 | --- | --- |
 | `docs/ARCHITECTURE.md` | The reference architecture: deployment shapes, OCI service mapping, security posture, known gaps, phased plan |
 | `docs/UPSTREAM.md` | Where OCI-related work should land upstream in the TinyHumans repos, and their contribution rules |
-| `deploy/` | OCI deployment assets (Terraform / Resource Manager stack, container recipes). Empty until phase 1 starts |
+| `deploy/terraform/` | Terraform for the Always Free pilot: compartment, network, Vault, ADB, Database Tools MCP Server, Ampere VM, load balancer, bastion |
+| `deploy/vm/` | Assets the VM fetches at boot: core Dockerfile around the upstream arm64 tarball, compose file, secret/config renderer, systemd timer |
+| `deploy/scripts/` | Operator steps Terraform cannot do: GenAI API key, CA trust, MCP registration, demo data |
+| `docs/PILOT-ACCOUNT-VALIDATION.md` | Read-only inventory proving the pilot fits a personal pay-as-you-go account on Always Free resources |
 
 ## Status
 
-Research and design. No OCI resources have been created from this repo yet.
+Phase 1 in progress: the Terraform stack plans clean and is being applied to a personal tenancy. See `deploy/README.md` for the run book.
 
 ## Privacy
 
