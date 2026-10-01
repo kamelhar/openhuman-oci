@@ -22,6 +22,16 @@ code. The field is open.
 | OCI OpenSearch as a search engine | `tinyhumansai/tinysearch` | optional, low priority | SearXNG self-hosted toggle |
 | Oracle MCP servers in the registry | upstream registries (Smithery, official MCP registry), not OpenHuman | | |
 
+## Findings from the pilot worth upstreaming
+
+| Finding | Suggested change | Repo |
+| --- | --- | --- |
+| Headless core cannot store secrets: `encrypted_file` keyring needs an OS keychain master key and there is no way to inject one | `OPENHUMAN_KEYRING_MASTER_KEY` (or a file path) for the `encrypted_file` backend; document `OPENHUMAN_KEYRING_BACKEND=file` as the current headless fallback | openhuman |
+| BYOK cloud providers are gated behind a TinyHumans session even in `serve` mode, while local runtimes are not | Either exempt custom cloud providers when `OPENHUMAN_BACKEND_API_KEY` is absent by design, or document the `local-openai` runtime as the supported headless BYOK path | openhuman |
+| Release tarballs for `aarch64-unknown-linux-gnu` require glibc 2.39 but the repo Dockerfile's runtime stage is Debian bookworm (2.36) | Publish an arm64 image, or note the glibc floor next to the tarball | openhuman |
+| `read_only: true` in the upstream compose breaks the core's `~/OpenHuman/projects` creation | Add a tmpfs or volume for `/home/openhuman/OpenHuman` in `docker-compose.yml` | openhuman |
+| `openhuman.inference_agent_chat_simple` is the simplest smoke test for a remote core | Mention it in the cloud-deploy page | openhuman docs |
+
 ## Contribution rules that will bite
 
 From `CONTRIBUTING.md` and `.github/PULL_REQUEST_TEMPLATE.md`:

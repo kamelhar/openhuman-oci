@@ -25,9 +25,18 @@ cd ../scripts
 ./01-genai-api-key.sh          # mints the GenAI API key, stores it in Vault
 ./02-trust-lb-cert.sh          # trusts the generated CA on macOS
 # identity domain console: My profile -> Tokens and keys -> My access tokens ->
-#   Invokes other APIs -> choose the MCP server app -> download tokens.tok
-./03-register-mcp.sh ~/Downloads/tokens.tok
-python3 04-seed-demo-data.py
+#   "Invokes other APIs" -> select the MCP server app (named <prefix>-adb-mcp) ->
+#   expiry -> Download token (tokens.tok)
+./03-register-mcp.sh ~/Downloads/tokens.tok   # stores it in Vault; the VM registers the server
+python3 04-seed-demo-data.py   # from an IP in the ADB access list; otherwise run it on the VM
+```
+
+Smoke test the core from your machine (token from Vault, CA from `terraform output`):
+
+```bash
+curl --cacert ca.pem -X POST "$(terraform -chdir=../terraform output -raw core_rpc_url)" \
+  -H "Authorization: Bearer $CORE_TOKEN" -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"openhuman.inference_agent_chat_simple","params":{"message":"Reply with exactly: OCI pilot OK"}}'
 ```
 
 Then open the OpenHuman desktop app, use the Advanced panel on the sign-in
@@ -40,13 +49,14 @@ with the core token from Vault.
 | --- | --- |
 | Compartment, VCN, public + private subnets, IGW, NAT, service gateway | all free |
 | NSGs: LB (443 from your CIDRs), core (7788 from LB, 22 from subnet), Database Tools PE | |
-| Vault + AES key + 4 secrets | core token, ADB admin password, GenAI API key (placeholder), TinyHumans key (optional) |
+| Vault + AES key + 5 secrets | core token, ADB admin password, GenAI API key and MCP user token (placeholders filled by scripts), TinyHumans key (optional) |
 | Autonomous Database 26ai, Always Free, TLS without wallet, ACL = VCN + your CIDRs | |
 | Database Tools private endpoint, connection (ADMIN), MCP server (resource principal) | |
 | Identity domain group for MCP users, dynamic group for the VM, one policy | |
 | Ampere A1 VM 3 OCPU / 18 GB, Ubuntu 24.04, 50 GB boot + 50 GB workspace volume | |
 | Flexible LB 10 Mbps, reserved public IP, generated CA + leaf cert, path allowlist | |
-| OCI Bastion (optional) | admin only |
+| OCI Bastion (optional) | admin only; set `bastion_client_cidrs` wider if your SSH egress IP differs from your HTTPS egress IP |
+| Log group + MCP invoke service log | the only place -32007 authorization failures name the missing permission |
 
 ## Teardown
 

@@ -40,7 +40,7 @@ on OCI.
 
 ## Status
 
-Phase 1 in progress: the Terraform stack plans clean and is being applied to a personal tenancy. See `deploy/README.md` for the run book.
+Phase 1 deployed to a personal tenancy on 2026-10-01: headless core on an Always Free Ampere VM answering through OCI Generative AI with no TinyHumans account, Always Free Autonomous Database 26ai seeded with a demo table, managed Database Tools MCP Server created and awaiting a user token. Findings are in `docs/ARCHITECTURE.md`; the run book is `deploy/README.md`.
 
 ## Privacy
 
