@@ -16,6 +16,8 @@ resource "oci_identity_domains_group" "mcp_users" {
   idcs_endpoint = local.domain.url
   schemas       = ["urn:ietf:params:scim:schemas:core:2.0:Group"]
   display_name  = "${var.name_prefix}-mcp-users"
+  # Without this the provider never reads members back and re-adds them on every plan.
+  attribute_sets = ["all"]
 
   members {
     type  = "User"

@@ -31,6 +31,7 @@ resource "oci_identity_domains_app" "mcp_client" {
   allowed_operations = ["introspect"]
   trust_scope        = "Explicit"
   bypass_consent     = true
+  force_delete       = true # apps must be inactive before deletion; let the provider handle it
 
   allowed_scopes {
     fqs = local.mcp_scope_fqs
