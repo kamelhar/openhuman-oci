@@ -1,0 +1,42 @@
+services:
+  openhuman-core:
+    image: openhuman-core:local
+    container_name: openhuman-core
+    restart: unless-stopped
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    cap_add: [CHOWN, SETUID, SETGID]
+    tmpfs:
+      - /tmp
+    ports:
+      - "7788:7788"
+    env_file:
+      - /opt/openhuman/core.env
+    environment:
+      OPENHUMAN_CORE_HOST: 0.0.0.0
+      OPENHUMAN_CORE_PORT: "7788"
+      OPENHUMAN_WORKSPACE: /home/openhuman/.openhuman
+      XDG_CACHE_HOME: /home/openhuman/.openhuman/cache
+      TMPDIR: /tmp
+    volumes:
+      - /opt/openhuman/data/workspace:/home/openhuman/.openhuman
+    mem_limit: 6g
+    cpus: 2.0
+    depends_on:
+      - ollama
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:7788/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    restart: unless-stopped
+    volumes:
+      - /opt/openhuman/data/ollama:/root/.ollama
+    mem_limit: 6g
+    cpus: 1.0

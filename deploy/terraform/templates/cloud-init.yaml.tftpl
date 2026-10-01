@@ -1,0 +1,22 @@
+#cloud-config
+package_update: true
+packages:
+  - curl
+  - jq
+  - python3-venv
+write_files:
+  - path: /opt/openhuman/bootstrap.env
+    permissions: "0600"
+    owner: root:root
+    content: |
+      ASSETS_BASE_URL=${assets_base_url}
+      OPENHUMAN_VERSION=${openhuman_version}
+      OCI_REGION=${oci_region}
+      GENAI_INFERENCE_URL=${genai_inference_url}
+      GENAI_CHAT_MODEL=${genai_chat_model}
+      TINYHUMANS_BACKEND_URL=${tinyhumans_backend_url}
+      SECRET_CORE_TOKEN=${secret_core_token}
+      SECRET_GENAI_API_KEY=${secret_genai_api_key}
+      SECRET_TINYHUMANS_KEY=${secret_tinyhumans_key}
+runcmd:
+  - [ bash, -c, "curl -fsSL ${assets_base_url}/bootstrap.sh -o /opt/openhuman/bootstrap.sh && chmod +x /opt/openhuman/bootstrap.sh && /opt/openhuman/bootstrap.sh >> /var/log/openhuman-bootstrap.log 2>&1" ]

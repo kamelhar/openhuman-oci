@@ -1,0 +1,36 @@
+# Wraps the upstream prebuilt aarch64 openhuman-core binary in the same runtime
+# image upstream uses, so no Rust build is needed on the VM.
+FROM debian:bookworm-slim
+ARG OPENHUMAN_VERSION
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates libssl3 libasound2 libxdo3 libxtst6 libx11-6 libevdev2 curl gosu \
+    && rm -rf /var/lib/apt/lists/*
+RUN groupadd --gid 10001 openhuman \
+ && useradd --uid 10001 --gid 10001 --create-home --shell /bin/bash openhuman \
+ && mkdir -p /home/openhuman/.openhuman && chown -R openhuman:openhuman /home/openhuman
+RUN set -eux; \
+    base="https://github.com/tinyhumansai/openhuman/releases/download/v${OPENHUMAN_VERSION}"; \
+    tgz="openhuman-core-${OPENHUMAN_VERSION}-aarch64-unknown-linux-gnu.tar.gz"; \
+    curl -fsSL "$base/$tgz" -o /tmp/core.tgz; \
+    curl -fsSL "$base/$tgz.sha256" -o /tmp/core.sha256; \
+    expected="$(awk '{print $1}' /tmp/core.sha256)"; \
+    actual="$(sha256sum /tmp/core.tgz | awk '{print $1}')"; \
+    [ "$expected" = "$actual" ] || { echo "sha256 mismatch"; exit 1; }; \
+    tar -xzf /tmp/core.tgz -C /usr/local/bin openhuman-core; \
+    chmod +x /usr/local/bin/openhuman-core; \
+    curl -fsSL "https://raw.githubusercontent.com/tinyhumansai/openhuman/v${OPENHUMAN_VERSION}/scripts/docker-entrypoint-core.sh" \
+      -o /usr/local/bin/docker-entrypoint-core.sh; \
+    sed -i 's/\r$//' /usr/local/bin/docker-entrypoint-core.sh; chmod +x /usr/local/bin/docker-entrypoint-core.sh; \
+    rm -f /tmp/core.tgz /tmp/core.sha256
+ENV HOME=/home/openhuman \
+    OPENHUMAN_WORKSPACE=/home/openhuman/.openhuman \
+    OPENHUMAN_CORE_HOST=0.0.0.0 \
+    OPENHUMAN_CORE_PORT=7788 \
+    OPENHUMAN_DOCKER=1 \
+    RUST_LOG=info
+EXPOSE 7788
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD curl -sf http://localhost:7788/health || exit 1
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint-core.sh"]
+CMD ["serve"]

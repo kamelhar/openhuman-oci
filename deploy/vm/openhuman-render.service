@@ -1,0 +1,9 @@
+[Unit]
+Description=Render OpenHuman core env/config from OCI Vault secrets
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/openhuman
+ExecStart=/opt/openhuman/venv/bin/python /opt/openhuman/render_config.py

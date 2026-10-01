@@ -1,0 +1,10 @@
+# Copy to terraform.tfvars (gitignored) and fill in. Never commit OCIDs.
+oci_profile          = "DEFAULT"
+tenancy_ocid         = "ocid1.tenancy.oc1..REPLACE"
+admin_user_ocid      = "ocid1.user.oc1..REPLACE"
+region               = "ca-toronto-1"
+genai_region         = "us-chicago-1"
+allowed_client_cidrs = ["203.0.113.10/32"] # your public IP
+ssh_public_key       = "ssh-ed25519 AAAA... you@laptop"
+genai_chat_model     = "openai.gpt-4.1"
+# tinyhumans_api_key = ""   # optional, managed features only
