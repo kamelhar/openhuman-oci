@@ -4,6 +4,10 @@ resource "oci_core_public_ip" "lb" {
   display_name   = "${var.name_prefix}-lb-ip"
   lifetime       = "RESERVED"
   freeform_tags  = local.common_tags
+
+  lifecycle {
+    ignore_changes = [private_ip_id]
+  }
 }
 
 # ---- generated TLS (default) -------------------------------------------------
@@ -119,21 +123,32 @@ resource "oci_load_balancer_backend" "core" {
   port             = 7788
 }
 
-# Only the listed paths reach the core. Anything else is answered 403 by the LB.
-resource "oci_load_balancer_rule_set" "path_allowlist" {
+# Only the listed paths reach the core. OCI load balancers cannot use PATH
+# conditions in ALLOW rules, so the allowlist is a path route set: listed
+# paths route to the core, everything else lands on an empty backend set.
+resource "oci_load_balancer_backend_set" "blackhole" {
+  load_balancer_id = oci_load_balancer_load_balancer.this.id
+  name             = "blackhole"
+  policy           = "ROUND_ROBIN"
+
+  health_checker {
+    protocol = "TCP"
+    port     = 1
+  }
+}
+
+resource "oci_load_balancer_path_route_set" "allowlist" {
   load_balancer_id = oci_load_balancer_load_balancer.this.id
   name             = "path_allowlist"
 
-  dynamic "items" {
+  dynamic "path_routes" {
     for_each = toset(var.allowed_paths)
     content {
-      action      = "ALLOW"
-      description = "allow ${items.value}"
+      path             = path_routes.value
+      backend_set_name = oci_load_balancer_backend_set.core.name
 
-      conditions {
-        attribute_name  = "PATH"
-        attribute_value = items.value
-        operator        = "EXACT_MATCH"
+      path_match_type {
+        match_type = "EXACT_MATCH"
       }
     }
   }
@@ -142,10 +157,10 @@ resource "oci_load_balancer_rule_set" "path_allowlist" {
 resource "oci_load_balancer_listener" "https" {
   load_balancer_id         = oci_load_balancer_load_balancer.this.id
   name                     = "https"
-  default_backend_set_name = oci_load_balancer_backend_set.core.name
+  default_backend_set_name = oci_load_balancer_backend_set.blackhole.name
+  path_route_set_name      = oci_load_balancer_path_route_set.allowlist.name
   port                     = 443
   protocol                 = "HTTP"
-  rule_set_names           = [oci_load_balancer_rule_set.path_allowlist.name]
 
   ssl_configuration {
     certificate_name        = oci_load_balancer_certificate.this.certificate_name

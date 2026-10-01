@@ -17,4 +17,9 @@ resource "oci_database_autonomous_database" "this" {
   whitelisted_ips             = concat([oci_core_vcn.this.id], var.allowed_client_cidrs)
 
   freeform_tags = local.common_tags
+
+  lifecycle {
+    # Always Free reports 0 cores (ECPU model); keep the create-time value.
+    ignore_changes = [cpu_core_count]
+  }
 }

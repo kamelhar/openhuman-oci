@@ -21,6 +21,10 @@ resource "oci_identity_domains_group" "mcp_users" {
     type  = "User"
     value = data.oci_identity_domains_users.admin.users[0].id
   }
+
+  lifecycle {
+    ignore_changes = [schemas]
+  }
 }
 
 # Instance principal for the core VM: lets it read its secrets from Vault.
