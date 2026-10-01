@@ -73,28 +73,19 @@ def rpc(method, params, token):
     return data.get("result")
 
 
-def discover_method(token, *needles):
-    """Find an RPC method whose name contains all needles (schema is public)."""
+MODEL_SETTINGS_METHOD = "openhuman.config_update_model_settings"
+LOCAL_AI_METHOD = "openhuman.config_update_local_ai_settings"
+
+
+def schema_methods():
+    """Method names advertised by the core's public /schema."""
     import requests
     try:
         schema = requests.get(f"{RPC}/schema", timeout=10).json()
+        return {m.get("method") for m in schema.get("methods", []) if isinstance(m, dict)}
     except Exception as e:
         print(f"schema fetch failed: {e}")
-        return None
-    names = []
-    if isinstance(schema, dict):
-        for key in ("methods", "rpc", "procedures"):
-            if key in schema and isinstance(schema[key], (list, dict)):
-                names = list(schema[key].keys()) if isinstance(schema[key], dict) else [m.get("name") if isinstance(m, dict) else m for m in schema[key]]
-                break
-        if not names:
-            names = list(schema.keys())
-    elif isinstance(schema, list):
-        names = [m.get("name") if isinstance(m, dict) else m for m in schema]
-    for n in names:
-        if n and all(x in n for x in needles):
-            return n
-    return None
+        return set()
 
 
 def main():
@@ -158,22 +149,25 @@ def main():
         print("core not healthy yet; will retry")
         return 0
 
-    method = os.environ.get("OPENHUMAN_RPC_MODEL_SETTINGS") or discover_method(core_token, "model", "settings")
-    local_ai_method = os.environ.get("OPENHUMAN_RPC_LOCAL_AI") or discover_method(core_token, "local_ai", "set")
-    if not method:
-        print("could not discover a model-settings RPC method; see /schema")
+    method = os.environ.get("OPENHUMAN_RPC_MODEL_SETTINGS", MODEL_SETTINGS_METHOD)
+    local_ai_method = os.environ.get("OPENHUMAN_RPC_LOCAL_AI", LOCAL_AI_METHOD)
+    advertised = schema_methods()
+    if advertised and method not in advertised:
+        print(f"{method} not in /schema; available model-settings methods: "
+              f"{sorted(n for n in advertised if n and 'model_settings' in n)}")
         return 0
 
     try:
-        if local_ai_method:
-            rpc(local_ai_method, {
-                "runtime_enabled": True,
-                "opt_in_confirmed": True,
-                "provider": "ollama",
-                "base_url": "http://ollama:11434",
-                "embedding_model_id": "bge-m3",
-                "usage_embeddings": True,
-            }, core_token)
+        # Ollama runtime for embeddings (the model is named by embeddings_provider).
+        rpc(local_ai_method, {
+            "runtime_enabled": True,
+            "opt_in_confirmed": True,
+            "provider": "ollama",
+            "base_url": "http://ollama:11434",
+            "usage_embeddings": True,
+        }, core_token)
+        # inference_url + api_key + default_model: the core completes the BYOK
+        # route (registers the provider, pins chat/reasoning/agentic/coding).
         rpc(method, desired, core_token)
         state["model_settings_hash"] = desired_hash
         state["model_settings_method"] = method
