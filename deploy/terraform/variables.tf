@@ -109,6 +109,17 @@ variable "genai_chat_model" {
   default     = "openai.gpt-4.1"
 }
 
+variable "inference_mode" {
+  description = "local-openai: OCI GenAI wired as a caller-owned OpenAI-compatible runtime, no TinyHumans session needed (default). byok-cloud: custom cloud route, requires a TinyHumans API key."
+  type        = string
+  default     = "local-openai"
+
+  validation {
+    condition     = contains(["local-openai", "byok-cloud"], var.inference_mode)
+    error_message = "inference_mode must be local-openai or byok-cloud."
+  }
+}
+
 variable "tinyhumans_backend_url" {
   description = "TinyHumans backend URL. The headless core expects it to be set even when inference is BYOK (Shape A)."
   type        = string

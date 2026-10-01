@@ -112,6 +112,9 @@ def main():
         # encrypted_file master key, so secrets live in the workspace file on
         # the (encrypted-at-rest) block volume.
         "OPENHUMAN_KEYRING_BACKEND=file",
+        # local-openai mode: the core treats OCI GenAI's OpenAI-compatible endpoint
+        # as a caller-owned runtime, which needs no TinyHumans session.
+        f"LOCAL_OPENAI_URL={cfg['GENAI_INFERENCE_URL']}",
         "RUST_LOG=info",
     ]
     if th_key and th_key != "NONE":
@@ -138,13 +141,37 @@ def main():
         print("GenAI API key not yet in Vault; skipping model settings")
         return 0
 
-    desired = {
-        "inference_url": cfg["GENAI_INFERENCE_URL"],
-        "api_key": genai_key,
-        "default_model": cfg["GENAI_CHAT_MODEL"],
-        "embeddings_provider": "ollama:bge-m3",
-    }
-    desired_hash = hashlib.sha256(json.dumps(desired, sort_keys=True).encode()).hexdigest()
+    mode = cfg.get("INFERENCE_MODE", "local-openai")
+    model = cfg["GENAI_CHAT_MODEL"]
+    if mode == "byok-cloud":
+        # Custom cloud route. Upstream gates this behind an active TinyHumans
+        # session or API key (OPENHUMAN_BACKEND_API_KEY).
+        desired = {
+            "inference_url": cfg["GENAI_INFERENCE_URL"],
+            "api_key": genai_key,
+            "default_model": model,
+            "embeddings_provider": "ollama:bge-m3",
+        }
+    else:
+        # Session-free: every role pinned to the local-openai runtime, whose
+        # endpoint is LOCAL_OPENAI_URL and whose bearer is local_ai.api_key.
+        role = f"local-openai:{model}"
+        desired = {
+            "inference_url": "",
+            "api_key": "",
+            "default_model": model,
+            "primary_cloud": "",
+            "chat_provider": role,
+            "reasoning_provider": role,
+            "agentic_provider": role,
+            "coding_provider": role,
+            "vision_provider": role,
+            "memory_provider": role,
+            "learning_provider": role,
+            "embeddings_provider": "ollama:bge-m3",
+        }
+    desired_for_hash = dict(desired, mode=mode, key_fp=hashlib.sha256(genai_key.encode()).hexdigest()[:12])
+    desired_hash = hashlib.sha256(json.dumps(desired_for_hash, sort_keys=True).encode()).hexdigest()
     if state.get("model_settings_hash") == desired_hash:
         print("model settings already applied")
         return 0
@@ -168,6 +195,7 @@ def main():
             "opt_in_confirmed": True,
             "provider": "ollama",
             "base_url": "http://ollama:11434",
+            "api_key": genai_key,  # bearer for the local-openai runtime
             "usage_embeddings": True,
         }, core_token)
         # inference_url + api_key + default_model: the core completes the BYOK
