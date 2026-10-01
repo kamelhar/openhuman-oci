@@ -2,6 +2,26 @@
 
 Status: draft, 2026-10-01. Based on OpenHuman docs and source as of v1.2.x.
 
+## 0. User stories
+
+The core story, and the only reason to run the core anywhere but a laptop:
+
+> As an OpenHuman user, I want my assistant to keep working when my laptop is
+> closed, so that auto-fetch keeps pulling my data every twenty minutes,
+> scheduled workflows run, and it answers me on Telegram, Slack or email at any
+> hour.
+
+The two clauses that make it an OCI story rather than a hosting story:
+
+> ... and my prompts and memory embeddings go to models in a cloud I already pay
+> for and trust, not through the vendor's inference proxy.
+
+> ... and it can answer questions about data in my Oracle Database, using the
+> database's own access controls, without me writing SQL or copying data out.
+
+If neither clause matters to the person deploying, use the upstream Fly or
+DigitalOcean recipe instead.
+
 ## 1. The first decision: which unit to deploy
 
 OpenHuman is a single-user desktop product with a headless core. There are two
@@ -47,8 +67,9 @@ redesign. Treat B as the enterprise target.
 ```
                  ┌──────────────────────── OCI tenancy ─────────────────────────┐
                  │                                                               │
- Desktop app ────┼─ OCI Bastion / internal LB ──► openhuman-core (per user)      │
- (external mode) │                                 │  workspace: Block Volume    │
+ Desktop app ────┼─ Load balancer (TLS, WAF,  ──► openhuman-core (per user)      │
+ (external mode) │   path allowlist /rpc,/health)                                │
+                 │                                 │  workspace: Block Volume    │
                  │                                 │  secrets: OCI Vault         │
                  │                                 ├──► LiteLLM gateway ──► OCI GenAI
                  │                                 │    (resource principal)  chat / embed / rerank
@@ -71,7 +92,7 @@ flowchart LR
 
   subgraph oci[OCI tenancy]
     direction LR
-    bastion[OCI Bastion /<br/>internal LB + NSG]
+    bastion[Load balancer<br/>TLS + WAF + path allowlist<br/>private over VPN, or public for pilot]
     subgraph okens[OKE or Container Instances, private subnet]
       core1[openhuman-core<br/>user A]
       core2[openhuman-core<br/>user B]
@@ -203,18 +224,20 @@ the workspace directory. Upstream applies AES-256-GCM at rest keyed by Argon2id.
 OKE: External Secrets Operator with the OCI Vault provider. Container Instances:
 Vault secret references in the environment.
 
-### 2.6 Network
+### 2.6 Network and client access
 
 The core binds `0.0.0.0:7788`. `/rpc` requires the bearer token. `/health`,
-`/events` and `/ws/dictation` are unauthenticated in the current build. The
-events stream carries agent activity.
+`/events` and `/ws/dictation` are unauthenticated in the current build, and the
+events stream carries agent activity. The core itself never gets a public IP.
 
-- Private subnet only. No public IP on the core.
-- Reach it through OCI Bastion port-forward, or an internal load balancer behind
-  a VPN or FastConnect, optionally with OCI WAF.
-- Network Security Group: inbound 7788 only from the bastion / LB subnet.
-- Confirm `/events` is not reachable by anyone who is not the owner before
-  onboarding a second user.
+| Deployment | Client path |
+| --- | --- |
+| Pilot, users outside a corporate network | Public OCI Load Balancer with TLS, a WAF rate-limit rule on `/rpc`, and a **path allowlist that forwards only `/rpc` and `/health`**. The allowlist closes the unauthenticated streams without an upstream code change. Dictation over the network is lost; use the desktop app's local dictation instead |
+| Oracle internal | Private OCI Load Balancer reached over the corporate VPN or FastConnect. Nothing public |
+| Admin / break-glass | OCI Bastion port-forward to the nodes or pods. Not the daily client path: sessions expire after three hours and need SSH |
+
+Network Security Group on the core: inbound 7788 only from the load balancer
+subnet. Rotate the bearer token on a schedule and after any suspected leak.
 
 ### 2.7 Egress governance (Shape A)
 
@@ -256,7 +279,7 @@ the pod be the boundary while keeping DB-facing agents at `readonly` /
 | Phase | Deliverable |
 | --- | --- |
 | 0 | This document reviewed. Decide pilot shape (A) and target compute (OKE vs Container Instances) |
-| 1 | Terraform / Resource Manager stack: VCN, private subnets, NAT with allowlist, Bastion, OKE or Container Instances, Block Volume per core, Vault, LiteLLM gateway with resource principal to OCI GenAI, Database Tools MCP Server over an ADB with a Database Tools connection and Vault wallet |
+| 1 | Terraform / Resource Manager stack: VCN, private subnets, NAT with allowlist, load balancer with path allowlist, OKE or Container Instances, Block Volume per core, Vault, LiteLLM gateway with resource principal to OCI GenAI, Database Tools MCP Server over an ADB with a Database Tools connection and Vault wallet |
 | 1 demo | Desktop app in external mode. Prompt: "what changed in the ORDERS table this week, and remember the summary". Agent calls MCP run-sql, writes to memory, result visible in the Obsidian vault |
 | 2 | Upstream contributions (see `UPSTREAM.md`): OCI deploy recipe, `oci` provider preset, Oracle AI Database memory driver |
 | 3 | Shape B: embed-based service, own auth, no TinyHumans transport |
