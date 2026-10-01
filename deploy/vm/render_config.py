@@ -108,6 +108,10 @@ def main():
         f"OPENHUMAN_CORE_TOKEN={core_token}",
         f"BACKEND_URL={cfg['TINYHUMANS_BACKEND_URL']}",
         "OPENHUMAN_APP_ENV=production",
+        # Headless: no OS keychain, and upstream has no way to inject the
+        # encrypted_file master key, so secrets live in the workspace file on
+        # the (encrypted-at-rest) block volume.
+        "OPENHUMAN_KEYRING_BACKEND=file",
         "RUST_LOG=info",
     ]
     if th_key and th_key != "NONE":

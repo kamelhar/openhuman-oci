@@ -22,6 +22,7 @@ services:
       TMPDIR: /tmp
     volumes:
       - /opt/openhuman/data/workspace:/home/openhuman/.openhuman
+      - /opt/openhuman/data/projects:/home/openhuman/OpenHuman
     mem_limit: 6g
     cpus: 2.0
     depends_on:

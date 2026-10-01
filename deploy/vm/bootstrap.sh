@@ -24,8 +24,8 @@ else
   log "WARN volume not found, using boot volume for data"
   mkdir -p "$BASE/data"
 fi
-mkdir -p "$BASE/data/workspace" "$BASE/data/ollama"
-chown -R 10001:10001 "$BASE/data/workspace"
+mkdir -p "$BASE/data/workspace" "$BASE/data/projects" "$BASE/data/ollama"
+chown -R 10001:10001 "$BASE/data/workspace" "$BASE/data/projects"
 
 # ---- docker ------------------------------------------------------------------
 if ! command -v docker >/dev/null 2>&1; then
