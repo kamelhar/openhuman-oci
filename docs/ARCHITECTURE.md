@@ -1,6 +1,6 @@
 # OpenHuman on OCI: reference architecture
 
-Status: draft, 2026-10-01. Based on OpenHuman docs and source as of v1.2.x.
+Status: living document. Based on OpenHuman docs and source as of v0.64.x (October 2026). The deployed pilot and its findings are in [`PILOT.md`](PILOT.md).
 
 ## 0. User stories
 
@@ -62,35 +62,8 @@ Build the reference architecture as Shape A now. Keep every OCI component
 identical for both shapes so the move to B is a container image swap, not a
 redesign. Treat B as the enterprise target.
 
-### Pilot decisions (2026-10-01)
-
-The first deployment in `deploy/` narrows Shape A to what fits Always Free:
-
-| Topic | Reference design | Pilot |
-| --- | --- | --- |
-| Compute | OKE or Container Instances, one core per user | One Ampere A1 VM (3 OCPU / 18 GB) running Docker Compose. Same container, same workspace layout, so moving to OKE later is a manifest change |
-| Core image | Upstream amd64 image | Upstream ships a prebuilt `aarch64` core tarball with each release. The VM wraps it in the upstream runtime image at boot. No Rust build, no registry |
-| Chat inference | LiteLLM gateway with resource-principal signing | OpenHuman calls the OCI GenAI OpenAI-compatible endpoint directly with a GenAI API key from Vault. LiteLLM is deferred: its proxy cannot use instance principals from config, so it would need a user API key too |
-| Embeddings | Via the gateway (Cohere embed on OCI) | Ollama `bge-m3` on the VM. Free, local, upstream's recommended embedder |
-| Client path | Load balancer with path allowlist | Same. Public flexible LB restricted to the operator's CIDR, generated CA, allowlist `/rpc`, `/health`, `/events` |
-| Database access | Database Tools MCP Server | Same. Resource-principal server and connection, ADB over TLS with a VCN access list through a Database Tools private endpoint |
-
-### Pilot results (2026-10-01, first apply)
-
-The stack in `deploy/` was applied to a personal pay-as-you-go tenancy. What
-worked, what had to change, and what was learned:
-
-| Area | Result |
-| --- | --- |
-| Terraform apply | 51 resources on first apply, one failure (LB rule set), fixed in a second apply. Everything Always Free except GenAI tokens |
-| Core image | Upstream's prebuilt `aarch64` tarball is linked against glibc 2.39. Debian bookworm (2.36) fails at exec; the runtime image is Ubuntu 24.04 |
-| Keyring | The headless core defaults to the `encrypted_file` keyring whose master key must come from an OS keychain. Containers have none and upstream offers no injection path, so the pilot uses `OPENHUMAN_KEYRING_BACKEND=file` on the encrypted block volume |
-| Inference without a TinyHumans account | Custom cloud providers (`inference_url` + `api_key`) are gated behind an active TinyHumans session or API key. Caller-owned runtimes are not. OCI GenAI's OpenAI-compatible endpoint is therefore wired as the `local-openai` runtime (`LOCAL_OPENAI_URL`, bearer in local-AI settings) with every role pinned to it. A chat turn through the headless core returned from OCI GenAI in 1.7 s with no account |
-| Load balancer | OCI LB cannot use PATH conditions in ALLOW rules. The allowlist is a path route set: listed paths go to the core, the default backend set is empty. Verified: `/health` 200, `/rpc` without token 401, other paths 502 |
-| Bastion | Sessions were closed by the bastion because this laptop's SSH egress IP differs from its HTTPS egress IP (split tunnel). `bastion_client_cidrs` is a separate variable for that case |
-| Database access list | Same split-egress effect: the laptop's database traffic was rejected by the ADB ACL. Seeding ran from the VM through the service gateway instead, using the instance principal to read the ADMIN password from Vault |
-| MCP server auth | A client-credentials OAuth client (created in Terraform) gets a valid token for the MCP audience, but IAM evaluates it as principal type `user` with the domain-app OCID and no policy form authorizes it (`request.principal.id`, `request.user.id`, even an unconditional any-user grant). The MCP invoke service log names the missing permission. Supported shapes are user tokens: personal access token, OAuth sign-in, or a trusted client acting on behalf of a user. The pilot stores a personal access token in Vault and the VM registers the server from there |
-| Embeddings | Ollama `bge-m3` on the VM, 1024 dimensions, reachable from the core container |
+The pilot that was actually built from this design, with its decisions and
+results, is in [`PILOT.md`](PILOT.md).
 
 ## 2. Component mapping
 

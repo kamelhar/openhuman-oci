@@ -14,7 +14,6 @@ wallet/
 *.tfvars
 !*.tfvars.example
 crash.log
-.terraform.lock.hcl
 
 # build and tooling
 target/
@@ -27,3 +26,7 @@ dist/
 *.tfplan
 tfplan
 *.tok
+
+# python
+__pycache__/
+*.pyc

@@ -8,7 +8,13 @@ release tag. A change to a provider or memory engine lands in its crate repo
 first, is released, then re-pinned in the main repo.
 
 As of 2026-10-01 there are no OCI or Oracle mentions in upstream issues, PRs or
-code. The field is open.
+code. The field is open. Issues already tracking the headless gaps this repo
+ran into: [#6601](https://github.com/tinyhumansai/openhuman/issues/6601)
+(key-first onboarding, run with your own providers and no sign-in wall),
+[#4844](https://github.com/tinyhumansai/openhuman/issues/4844) (headless Linux
+build with CI), [#5444](https://github.com/tinyhumansai/openhuman/issues/5444)
+(desktop client to remote headless core), [#5199](https://github.com/tinyhumansai/openhuman/issues/5199)
+(slim and headless dependency profiles). Comment there before opening new ones.
 
 ## Where each piece lands
 
@@ -21,6 +27,32 @@ code. The field is open.
 | Remote MCP OAuth 2.0 authorization-code flow headlessly (needed for Database Tools MCP Server) | `tinyhumansai/tinymcp` | check first whether the OAuth-callback helper already covers it | |
 | OCI OpenSearch as a search engine | `tinyhumansai/tinysearch` | optional, low priority | SearXNG self-hosted toggle |
 | Oracle MCP servers in the registry | upstream registries (Smithery, official MCP registry), not OpenHuman | | |
+
+## Can code from this repository go upstream?
+
+Short answer: the Terraform and OCI wiring cannot, two small pieces can almost
+as-is, and the most valuable contributions are Rust changes this repo only
+*worked around*. Licensing is not an obstacle: this repository is Apache-2.0,
+upstream is GPL-3.0, and Apache-2.0 code may be contributed into a GPL-3.0
+project (the contributor relicenses their own work on submission; upstream has
+no CLA or DCO).
+
+| What is here | Upstreamable? | Form | Notes |
+| --- | --- | --- | --- |
+| `deploy/vm/Dockerfile.core` (runtime image on Ubuntu 24.04 around the release tarball) | Yes, adapted | PR: `Dockerfile.release` or an arm64 image publish job | Upstream's Dockerfile builds from source on Debian bookworm, whose glibc cannot run the published aarch64 tarball. A release-based image is faster to build and multi-arch |
+| `deploy/vm/compose.yaml` projects volume | Yes | One-line PR to `docker-compose.yml` | `read_only: true` breaks `~/OpenHuman/projects` creation; a tmpfs or volume fixes it |
+| `deploy/vm/render_config.py` (push BYOK settings via RPC after boot) | No, but it defines the gap | Rust PR: boot-time env for BYOK (`OPENHUMAN_INFERENCE_URL`, `OPENHUMAN_INFERENCE_API_KEY`, `OPENHUMAN_DEFAULT_MODEL`, `OPENHUMAN_EMBEDDINGS_PROVIDER`) next to `OPENHUMAN_BACKEND_API_KEY` in `security/credentials/ops/boot_env.rs`, calling the same completion path as `config_update_model_settings` | Removes the need for any post-boot RPC choreography in headless deploys |
+| `OPENHUMAN_KEYRING_BACKEND=file` workaround | No, but it defines the gap | Rust PR: `OPENHUMAN_KEYRING_MASTER_KEY` (hex) or `_FILE` for the `encrypted_file` backend in `security/keyring/encrypted_file_backend.rs` | Lets containers keep encrypted secrets without an OS keychain |
+| `local-openai` mode for OCI GenAI | No code, a documentation fact (and evidence for #6601) | Docs PR to `gitbooks/features/model-routing/local-and-byok-models.md` and `cloud-deploy.md`: headless BYOK works through caller-owned runtimes; custom cloud providers need a session | Or a maintainer decision to exempt custom cloud providers in `serve` mode when no backend credential exists |
+| OCI GenAI as a provider preset | Yes | PR to `tinyinference` (provider adapter, OpenAI-compatible, regional endpoint template) then the preset slug in `openhuman` | Needs a region parameter; presets today have fixed endpoints |
+| OCI GenAI native embeddings | Yes | PR to `tinyinference-embeddings` | Embeddings are not on OCI's OpenAI-compatible path |
+| `deploy/terraform/*` | No | Link from `cloud-deploy.md` as a community recipe, like the DigitalOcean and Fly entries | Too large and OCI-specific for upstream; a one-file Resource Manager stack could be offered later |
+| `deploy/scripts/*` | No | None | Operator glue around the OCI CLI |
+| Database Tools MCP Server wiring and the auth finding | No | Maybe a gitbook note under MCP servers: remote servers with bearer headers, token refresh | The IAM finding belongs to Oracle, not OpenHuman |
+
+Upstream's gates apply to all of the above: 80 percent diff coverage on changed
+lines, a failure-path test, no live network in tests, and vendored crates are
+pinned by release, so `tinyinference` changes land there first.
 
 ## Findings from the pilot worth upstreaming
 
