@@ -38,6 +38,7 @@ output "secret_ids" {
     adb_admin_password = oci_vault_secret.adb_admin_password.id
     genai_api_key      = oci_vault_secret.genai_api_key.id
     tinyhumans_api_key = oci_vault_secret.tinyhumans_api_key.id
+    mcp_user_token     = oci_vault_secret.mcp_user_token.id
   }
 }
 

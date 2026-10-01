@@ -44,6 +44,8 @@ resource "oci_core_instance" "core" {
       secret_core_token      = oci_vault_secret.core_token.id
       secret_genai_api_key   = oci_vault_secret.genai_api_key.id
       secret_tinyhumans_key  = oci_vault_secret.tinyhumans_api_key.id
+      secret_mcp_user_token  = oci_vault_secret.mcp_user_token.id
+      mcp_endpoint           = oci_database_tools_database_tools_mcp_server.adb.endpoints[0].endpoint
     }))
   }
 

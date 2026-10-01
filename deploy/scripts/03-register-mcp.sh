@@ -8,6 +8,15 @@ TOKEN_FILE="${1:?personal access token file}"
 PAT=$(jq -r '.app_access_token // .access_token // empty' "$TOKEN_FILE" 2>/dev/null || true)
 [ -n "$PAT" ] || PAT=$(tr -d '\n' < "$TOKEN_FILE")
 
+if [ "${2:-}" != "--direct" ]; then
+  SECRET_ID=$(tfjson secret_ids | jq -r .mcp_user_token)
+  oci vault secret update-base64 --secret-id "$SECRET_ID" --secret-content-content "$(printf %s "$PAT" | base64)" \
+     --profile "$PROFILE" --region "$HOME_REGION" >/dev/null
+  unset PAT
+  echo "token stored in Vault; the VM registers the MCP server within ~2 minutes (openhuman-render.timer)."
+  exit 0
+fi
+
 RPC_URL="$(tfout core_rpc_url)"
 ENDPOINT="$(tfjson mcp_server | jq -r '.endpoints[0].endpoint')"
 CORE_TOKEN=$(oci secrets secret-bundle get --secret-id "$(tfjson secret_ids | jq -r .core_token)" \

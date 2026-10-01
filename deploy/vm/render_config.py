@@ -74,6 +74,7 @@ def rpc(method, params, token):
 
 
 MODEL_SETTINGS_METHOD = "openhuman.config_update_model_settings"
+MCP_CONFIG_METHOD = "openhuman.mcp_clients_config_set"
 LOCAL_AI_METHOD = "openhuman.config_update_local_ai_settings"
 
 
@@ -86,6 +87,28 @@ def schema_methods():
     except Exception as e:
         print(f"schema fetch failed: {e}")
         return set()
+
+
+def register_mcp(secrets, cfg, state, core_token):
+    """Declare the Database Tools MCP Server in the core once a user token is in Vault."""
+    token = secret_value(secrets, cfg["SECRET_MCP_USER_TOKEN"])
+    if token in ("", "PENDING"):
+        return
+    fp = hashlib.sha256((token + cfg["MCP_ENDPOINT"]).encode()).hexdigest()
+    if state.get("mcp_hash") == fp:
+        return
+    doc = {"mcpServers": {"oracle-db": {
+        "url": cfg["MCP_ENDPOINT"],
+        "headers": {"Authorization": f"Bearer {token}"},
+        "description": "Oracle AI Database via the OCI Database Tools MCP Server",
+    }}}
+    try:
+        rpc(MCP_CONFIG_METHOD, doc, core_token)
+        state["mcp_hash"] = fp
+        save_state(state)
+        print("MCP server registered in the core")
+    except Exception as e:
+        print(f"MCP registration failed: {e}")
 
 
 def main():
@@ -136,6 +159,9 @@ def main():
                 if core_healthy():
                     break
                 time.sleep(5)
+
+    if cfg.get("SECRET_MCP_USER_TOKEN") and cfg.get("MCP_ENDPOINT") and core_healthy():
+        register_mcp(secrets, cfg, state, core_token)
 
     if genai_key in ("", "PENDING"):
         print("GenAI API key not yet in Vault; skipping model settings")

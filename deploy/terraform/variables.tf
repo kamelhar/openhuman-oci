@@ -196,6 +196,12 @@ variable "bastion_client_cidrs" {
   default     = []
 }
 
+variable "enable_mcp_oauth_client" {
+  description = "Experimental: create a client-credentials OAuth client for the MCP server. IAM could not authorize it as of 2026-10-01; the supported path is a user token stored in Vault."
+  type        = bool
+  default     = false
+}
+
 variable "enable_bastion" {
   description = "Create an OCI Bastion for admin access to the private subnet."
   type        = bool

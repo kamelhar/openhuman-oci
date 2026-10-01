@@ -92,3 +92,23 @@ resource "oci_vault_secret" "tinyhumans_api_key" {
     content      = base64encode(var.tinyhumans_api_key != "" ? var.tinyhumans_api_key : "NONE")
   }
 }
+
+# Personal access token (identity domain, "Invokes other APIs" -> the MCP server
+# app) the core presents to the Database Tools MCP Server. Filled in by
+# deploy/scripts/03-register-mcp.sh.
+resource "oci_vault_secret" "mcp_user_token" {
+  compartment_id = local.compartment_id
+  vault_id       = oci_kms_vault.this.id
+  key_id         = oci_kms_key.this.id
+  secret_name    = "${var.name_prefix}-mcp-user-token"
+  description    = "Bearer token for the Database Tools MCP Server (PENDING until set)"
+
+  secret_content {
+    content_type = "BASE64"
+    content      = base64encode("PENDING")
+  }
+
+  lifecycle {
+    ignore_changes = [secret_content]
+  }
+}

@@ -19,5 +19,7 @@ write_files:
       SECRET_CORE_TOKEN=${secret_core_token}
       SECRET_GENAI_API_KEY=${secret_genai_api_key}
       SECRET_TINYHUMANS_KEY=${secret_tinyhumans_key}
+      SECRET_MCP_USER_TOKEN=${secret_mcp_user_token}
+      MCP_ENDPOINT=${mcp_endpoint}
 runcmd:
   - [ bash, -c, "curl -fsSL ${assets_base_url}/bootstrap.sh -o /opt/openhuman/bootstrap.sh && chmod +x /opt/openhuman/bootstrap.sh && /opt/openhuman/bootstrap.sh >> /var/log/openhuman-bootstrap.log 2>&1" ]
