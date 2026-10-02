@@ -26,6 +26,9 @@ build with CI), [#5444](https://github.com/tinyhumansai/openhuman/issues/5444)
 | BYOK without a TinyHumans session | comment on [#6601](https://github.com/tinyhumansai/openhuman/issues/6601#issuecomment-5952668753) with evidence and a minimal proposal | awaiting maintainer |
 | OCI GenAI provider preset, native embeddings | not filed | after the above land |
 | `local-openai` runtime: opt-in native tool calling for hosted OpenAI-compatible endpoints (profile is `PromptGuided`); `direct_tools` for registry-declared MCP servers | not filed | evidence from the research showcase in `docs/PILOT.md` |
+| OpenAI-compatible transport sends `max_tokens` to prefixed reasoning model ids (`openai.gpt-5.4` on OCI) and gets HTTP 400 `Use max_completion_tokens`; `is_reasoning_model` should match after a vendor prefix or be configurable | not filed (tinyinference) | reproduced 2026-10-02 on OCI GenAI |
+| `model_override` on `inference_agent_chat` is ignored when roles are pinned to a local runtime | not filed | turn log keeps the pinned model |
+| Agent `memory_recall` tool returns empty while `memory_recall_memories` RPC lists the stored note (headless, no session) | not filed | likely embeddings/indexing gated or lagging; see `docs/PILOT.md` |
 
 Fork: `fede-kamel/openhuman`. Branches: `fix/compose-projects-volume`, `docs/headless-deploy-gaps`.
 

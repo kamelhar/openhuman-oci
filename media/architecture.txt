@@ -1,0 +1,12 @@
+  Laptop ──HTTPS+bearer──► Load balancer ──7788──► Ampere A1 VM (private subnet, Always Free)
+                            /rpc /health /events     ├─ openhuman-core  (upstream aarch64 binary, container)
+                            everything else: 502     ├─ Ollama bge-m3   (embeddings)
+                                                     ├─ SearXNG         (web search, no key)
+                                                     └─ Playwright MCP  (headless Chromium, 25 browser tools)
+                                                              │ instance principal
+                                                              ▼
+  OCI Vault ─ core token · GenAI API key · DB password · MCP user token
+       │
+       ├──► OCI Generative AI (us-chicago-1)  OpenAI-compatible endpoint, wired as "local-openai" → no vendor account
+       └──► Database Tools MCP Server ──► private endpoint ──► service gateway ──► Autonomous AI Database 26ai
+            (managed, IAM app roles)                                              (Always Free, TLS, VCN-only ACL)

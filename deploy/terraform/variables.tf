@@ -109,6 +109,12 @@ variable "genai_chat_model" {
   default     = "openai.gpt-4.1"
 }
 
+variable "genai_temperature" {
+  description = "Sampling temperature pinned on every agent role (provider-string suffix). Low values make the prompt-guided tool protocol more reliable. Empty string leaves the model default."
+  type        = string
+  default     = "0.2"
+}
+
 variable "inference_mode" {
   description = "local-openai: OCI GenAI wired as a caller-owned OpenAI-compatible runtime, no TinyHumans session needed (default). byok-cloud: custom cloud route, requires a TinyHumans API key."
   type        = string

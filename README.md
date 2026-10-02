@@ -52,6 +52,16 @@ Two supporting stories ride on the same stack: a platform engineer who wants
 one governed way for *any* agent harness to reach Oracle Database, and an
 advocate who needs a live, reproducible demo of OCI for agents.
 
+## Showcase video
+
+[![OpenHuman on OCI showcase](media/title.png)](media/openhuman-oci-showcase.mp4)
+
+One scripted session against the live deployment: the edge checks, a headless
+browser drive to oracle.com/mcp, a web research turn that stores its findings
+in memory, and the memory answering later without the web. Recorded with
+`media/demo.tape` (VHS) driving `deploy/scripts/demo.sh`; the title, screenshot
+and outro cards are rendered by `media/`. Re-record with `vhs media/demo.tape`.
+
 ## What gets built
 
 ```mermaid

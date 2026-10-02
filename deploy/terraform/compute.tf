@@ -39,6 +39,7 @@ resource "oci_core_instance" "core" {
       oci_region             = var.region
       genai_inference_url    = local.genai_inference_url
       genai_chat_model       = var.genai_chat_model
+      genai_temperature      = var.genai_temperature
       inference_mode         = var.inference_mode
       tinyhumans_backend_url = var.tinyhumans_backend_url
       secret_core_token      = oci_vault_secret.core_token.id

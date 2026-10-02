@@ -59,6 +59,17 @@ uses. And the `local-openai` runtime is `PromptGuided` for tool calling (textual
 dialect, not native function calling); it worked reliably with gpt-4.1 in every
 run, but an unloaded tool name can leak into the reply as text.
 
+### Memory recall gap (2026-10-02)
+
+`memory_store` from an agent turn lands in the memory tree (the
+`openhuman.memory_recall_memories` RPC lists the note with its URLs), but the
+agent-side `memory_recall` tool returns nothing for the same facts, with or
+without a topic. The likely cause is that semantic recall needs embeddings the
+background indexer has not produced yet; the periodic memory sync runs every
+20 minutes and some services stay deferred without a TinyHumans session. The
+showcase script therefore tries the agent's recall first and falls back to
+reading the stored note through the RPC. Open question for upstream.
+
 ## Current state
 
 | Item | State |

@@ -24,7 +24,8 @@ else
   log "WARN volume not found, using boot volume for data"
   mkdir -p "$BASE/data"
 fi
-mkdir -p "$BASE/data/workspace" "$BASE/data/projects" "$BASE/data/ollama"
+mkdir -p "$BASE/data/workspace" "$BASE/data/projects" "$BASE/data/ollama" "$BASE/data/playwright-out"
+chmod 0777 "$BASE/data/playwright-out"
 chown -R 10001:10001 "$BASE/data/workspace" "$BASE/data/projects"
 
 # ---- docker ------------------------------------------------------------------

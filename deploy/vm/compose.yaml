@@ -65,7 +65,10 @@ services:
     restart: unless-stopped
     init: true
     entrypoint: ["node", "/app/cli.js"]
-    command: ["--headless", "--browser", "chromium", "--no-sandbox", "--isolated", "--port", "8931", "--host", "0.0.0.0", "--allowed-hosts", "playwright-mcp,playwright-mcp:8931,localhost,127.0.0.1"]
+    working_dir: /output   # named screenshots resolve against cwd
+    command: ["--headless", "--browser", "chromium", "--no-sandbox", "--isolated", "--port", "8931", "--host", "0.0.0.0", "--output-dir", "/output", "--viewport-size", "1280x800", "--allowed-hosts", "playwright-mcp,playwright-mcp:8931,localhost,127.0.0.1"]
+    volumes:
+      - /opt/openhuman/data/playwright-out:/output
     shm_size: 1g
     mem_limit: 2g
     cpus: 1.0

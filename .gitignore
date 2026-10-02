@@ -30,3 +30,10 @@ tfplan
 # python
 __pycache__/
 *.pyc
+
+# video intermediates (final cut is committed)
+media/demo.mp4
+media/title.mp4
+media/outro.mp4
+media/browser-card.mp4
+media/browser.mp4

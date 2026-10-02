@@ -194,7 +194,8 @@ def main():
     else:
         # Session-free: every role pinned to the local-openai runtime, whose
         # endpoint is LOCAL_OPENAI_URL and whose bearer is local_ai.api_key.
-        role = f"local-openai:{model}"
+        temp = cfg.get("GENAI_TEMPERATURE", "").strip()
+        role = f"local-openai:{model}" + (f"@{temp}" if temp else "")
         desired = {
             "inference_url": "",
             "api_key": "",
