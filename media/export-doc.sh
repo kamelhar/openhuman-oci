@@ -15,7 +15,7 @@ import re, sys
 src, dst = sys.argv[1:3]
 text = open(src).read()
 # "![alt](path)\n\n*Figure N. caption*" -> one pandoc figure whose caption is the italic text
-text = re.sub(r"^!\[[^\]]*\]\(([^)]+)\)\s*\n\n\*(Figure[^*]+)\*\s*$", r"![\2](\1){width=6.5in}", text, flags=re.M)
+text = re.sub(r"^!\[[^\]]*\]\(([^)]+)\)[ \t]*\n\n\*(Figure[^*]+)\*[ \t]*$", r"![\2](\1){width=6.5in}", text, flags=re.M)
 text = re.sub(r"^(!\[[^\]]*\]\([^)]+\))\s*$", r"\1{width=6.5in}", text, flags=re.M)
 open(dst, "w").write(text)
 PY
