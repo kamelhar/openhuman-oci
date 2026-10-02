@@ -94,6 +94,17 @@ recording is gpt-4.1 at temperature 0.2; the gpt-5 family is unusable on the
 - OCI's OpenAI-compatible endpoint caps `tool_call_id` at 64 characters; the
   harness mints 69. Four rejected turns in a day. Filed upstream as #6933.
 
+## Research showcase (2026-10-02)
+
+Second video, `media/openhuman-oci-research-showcase.mp4`: the clinical use case
+end to end except the agent's governed SQL leg (user token pending). Dataset of
+4,300 ClinicalTrials.gov Alzheimer's studies in the ADB, SQL from inside the
+VCN, three researcher turns in parallel, synthesis, FDA-sourced deep dive,
+memory read-back. Findings along the way: `spawn_async_subagent`'s enum is
+compiled from the default definition (#6934); OCI caps `tool_call_id` at 64
+(#6933); bounded `web_fetch` sizes and one call per message are what make the
+prompt-guided dialect dependable.
+
 ## Current state
 
 | Item | State |

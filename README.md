@@ -62,6 +62,18 @@ in memory, and the memory answering later without the web. Recorded with
 `media/demo.tape` (VHS) driving `deploy/scripts/demo.sh`; the title, screenshot
 and outro cards are rendered by `media/`. Re-record with `vhs media/demo.tape`.
 
+## Research showcase video
+
+[![Deep research on a clinical dataset](media/title-research.png)](media/openhuman-oci-research-showcase.mp4)
+
+The second film is the use case in `docs/usecases/alzheimers-trial-landscape.md`:
+4,300 public Alzheimer's trials in the Autonomous Database, SQL inside the VCN
+naming the top Phase 3 sponsors, three researcher agents on the live web in
+parallel, a synthesis that contrasts historical trial counts with today's
+pipeline, a deep dive on an approved program from FDA pages, and the brief
+read back from memory. Driven by `deploy/scripts/demo-research.sh`, recorded
+with `media/demo-research.tape`, assembled by `media/assemble-research.sh`.
+
 ## What gets built
 
 ```mermaid

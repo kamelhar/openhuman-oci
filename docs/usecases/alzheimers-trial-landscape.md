@@ -56,7 +56,25 @@ script. Snapshot numbers at load (2026-10-02):
 - The same conversation works for any Oracle Database a customer already has;
   only the table changes.
 
-## Status
+## Status (2026-10-02)
 
-Steps 2 to 6 run today. Step 1 waits for the operator's personal access token
-for the MCP server (`deploy/scripts/03-register-mcp.sh`).
+Steps 2 to 6 run today and are recorded in `media/openhuman-oci-research-showcase.mp4`
+(`deploy/scripts/demo-research.sh`). The dataset scene runs its SQL on the VM
+inside the VCN; the agent's own governed SQL through the MCP server (step 1)
+waits for the operator's personal access token (`deploy/scripts/03-register-mcp.sh`).
+
+What the first full run found: the registry ranks Lilly, Otsuka, Roche, Pfizer
+and J&J as the most active Phase 3 industry sponsors over all time; the live
+web shows Lilly and Roche (trontinemab, Phase 3) driving the current pipeline,
+Otsuka's late-stage presence unclear, and Pfizer with no late-stage Alzheimer's
+program since its 2018 exit. The donanemab deep dive came back with FDA label
+dosing and ARIA rates and two fda.gov sources.
+
+## Engineering notes
+
+- Fan-out is three parallel `inference_agent_chat` turns from the client plus a
+  synthesis turn. The orchestrator's `spawn_async_subagent` cannot reach a
+  custom agent today (upstream #6934), and the team RPCs expect workers that
+  claim and complete tasks themselves.
+- Prompt recipe that made the prompt-guided dialect reliable:
+  `deploy/scripts/usecase-prompts.md`.
