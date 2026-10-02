@@ -133,14 +133,15 @@ Three flows define the system. Each is drawn as the sequence of principals and c
 
 ```
 laptop ──HTTPS──► LB:443 ─ NSG: source in allowed_client_cidrs?
-                           ─ path route set: /rpc, /health, /events → "core" backend set; else → "blackhole"
+                           ─ path route set: /rpc /health /events → "core"; anything else → "blackhole"
                   LB ──HTTP──► VM:7788 ─ NSG: source is the LB's NSG?
                   core ─ Authorization: Bearer == OPENHUMAN_CORE_TOKEN? (401 otherwise)
                   core ─ role pinned to local-openai:openai.gpt-4.1@0.2
-                  core ──HTTPS via NAT──► inference.generativeai.us-chicago-1.oci.oraclecloud.com/openai/v1/chat/completions
+                  core ──HTTPS via NAT──► inference.generativeai.<region>.oci.oraclecloud.com
+                                          /openai/v1/chat/completions
                                           Authorization: Bearer <GenAI API key>
-                       OCI IAM: request.principal.type = 'generativeaiapikey' allowed in this compartment?
-                  core ◄── completion ──► tools (search, fetch, browser, memory) ──► next model call …
+                       OCI IAM: principal type 'generativeaiapikey' allowed in this compartment?
+                  core ◄── completion ──► tools (search, fetch, browser, memory) ──► next call …
                   laptop ◄── JSON-RPC result
 ```
 
@@ -150,11 +151,12 @@ laptop ──HTTPS──► LB:443 ─ NSG: source in allowed_client_cidrs?
 systemd timer (every 2 min) ──► render_config.py
   ── InstancePrincipalsSecurityTokenSigner ──► Vault: get_secret_bundle × 5
        OCI IAM: dynamic-group openhuman-vm may read secret-bundles in compartment?
-  ── core.env (bearer token, backend URL, keyring backend, SearXNG, LOCAL_OPENAI_URL) ──► restart core only if changed
+  ── core.env (bearer token, backend URL, keyring backend, SearXNG, LOCAL_OPENAI_URL)
+     ──► restart the core only if the file changed
   ── JSON-RPC to 127.0.0.1:7788 with the bearer:
        config_update_local_ai_settings  (Ollama runtime + GenAI key as the local-openai bearer)
-       config_update_model_settings     (roles → local-openai:<model>@<temperature>, embeddings → ollama:bge-m3)
-       mcp_clients_config_set           (browser server always; oracle-db server when the user token exists)
+       config_update_model_settings     (roles → local-openai:<model>@<temp>; embeddings → ollama:bge-m3)
+       mcp_clients_config_set           (browser server always; oracle-db once the user token exists)
        agent_registry_*                 (researcher sub-agent, orchestrator allowlist)
 ```
 
@@ -165,9 +167,9 @@ core ──streamable HTTP MCP──► mcp.dbtools.<region>.oci.oraclecloud.com
        Authorization: Bearer <identity-domain user token>
      Database Tools service: token valid? caller holds MCP_Operator on the server's app?
      OCI IAM: caller may use database-tools-mcp-servers-invocation in compartment?
-     MCP server (resource principal) may use database-tools-connections where request.principal.id = <server>?
-     connection (resource principal) may read secret-bundles where request.principal.id = <connection>?
-     connection ──TLS──► private endpoint VNIC in the private subnet ──► service gateway ──► ADB public endpoint
+     MCP server (resource principal) may use database-tools-connections, principal.id = <server>?
+     connection (resource principal) may read secret-bundles, principal.id = <connection>?
+     connection ──TLS──► private endpoint VNIC (private subnet) ──► service gateway ──► ADB endpoint
      ADB access list: source VCN OCID present? → dbtools_execute_sql → rows ──► core
 ```
 
@@ -321,9 +323,12 @@ An Always Free Autonomous AI Database 26ai, OLTP, with mutual TLS disabled so th
 Oracle documents twelve policy layouts for MCP servers depending on runtime identities and authentication type. The pilot uses the resource-principal / resource-principal / password / compartment-scope layout:
 
 ```
-allow group '<domain>'/'openhuman-mcp-users' to use database-tools-mcp-servers-invocation in compartment <c>
-allow any-user to use database-tools-connections in compartment <c> where request.principal.id = '<mcp-server-ocid>'
-allow any-user to read secret-bundles in compartment <c> where request.principal.id = '<connection-ocid>'
+allow group '<domain>'/'openhuman-mcp-users'
+  to use database-tools-mcp-servers-invocation in compartment <c>
+allow any-user to use database-tools-connections in compartment <c>
+  where request.principal.id = '<mcp-server-ocid>'
+allow any-user to read secret-bundles in compartment <c>
+  where request.principal.id = '<connection-ocid>'
 ```
 
 plus the identity-domain side: the MCP server registers itself as a resource-server application; Terraform grants that application's `MCP_Operator` role to the users group with an `oci_identity_domains_grant`. The user who will invoke the server is a member of the group.
