@@ -42,6 +42,8 @@ cat > "$TMP/head.tex" <<'TEX'
 \fvset{fontsize=\scriptsize,breaklines}
 \RecustomVerbatimEnvironment{verbatim}{Verbatim}{fontsize=\scriptsize,breaklines=true,breakanywhere=true}
 \usepackage{etoolbox}
+\usepackage{caption}
+\captionsetup{labelformat=empty,font=small,labelfont=bf}
 \AtBeginEnvironment{longtable}{\footnotesize}
 TEX
 pandoc "$TMP/docs/doc.md" --from markdown-raw_html-smart --toc --toc-depth=2 --pdf-engine=xelatex \
