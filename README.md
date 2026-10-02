@@ -6,6 +6,8 @@ Generative AI**, agent access to **Oracle AI Database** through Oracle's managed
 **Database Tools MCP Server**, everything else on **Always Free** resources, all
 of it in Terraform.
 
+**Read the full architecture reference:** [`docs/OPENHUMAN-ON-OCI.md`](docs/OPENHUMAN-ON-OCI.md) (planes, flows, principals, findings, the clinical use case as observed).
+
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Terraform](https://img.shields.io/badge/terraform-%3E%3D1.5-7B42BC.svg)](deploy/terraform)
 [![OpenHuman](https://img.shields.io/badge/openhuman-0.64.x-black.svg)](https://github.com/tinyhumansai/openhuman)
@@ -164,6 +166,7 @@ Short version; details and evidence in [`docs/PILOT.md`](docs/PILOT.md).
 
 | Path | Contents |
 | --- | --- |
+| [`docs/OPENHUMAN-ON-OCI.md`](docs/OPENHUMAN-ON-OCI.md) | The architecture reference: every plane, flow, principal and secret of the deployment, the inference and MCP findings, the clinical use case with observed results, cost, operations, upstream status |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Reference design: deployment shapes, OCI service mapping, security posture, egress, phased plan |
 | [`docs/PILOT.md`](docs/PILOT.md) | What was built, decisions, results, current state, operating notes |
 | [`docs/PILOT-ACCOUNT-VALIDATION.md`](docs/PILOT-ACCOUNT-VALIDATION.md) | Read-only check that the pilot fits a personal account on Always Free |
