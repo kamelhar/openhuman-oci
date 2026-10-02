@@ -484,7 +484,7 @@ Everything the deployment found that belongs to OpenHuman rather than to this re
 | --- | --- | --- |
 | Compose `read_only` root leaves the agent projects directory uncreatable | [#6925](https://github.com/tinyhumansai/openhuman/issues/6925), PR [#6928](https://github.com/tinyhumansai/openhuman/pull/6928) | Open |
 | Docs: glibc floor of release tarballs, headless without an account, container keyring, OCI recipe | [#6927](https://github.com/tinyhumansai/openhuman/issues/6927), PR [#6929](https://github.com/tinyhumansai/openhuman/pull/6929) | Open |
-| Headless keyring master key cannot be injected | [#6926](https://github.com/tinyhumansai/openhuman/issues/6926), PR [#6935](https://github.com/tinyhumansai/openhuman/pull/6935) | Open; 15 backend tests, env var or key file |
+| Headless keyring master key cannot be injected | [#6926](https://github.com/tinyhumansai/openhuman/issues/6926), PR [#6935](https://github.com/tinyhumansai/openhuman/pull/6935) | Open; env var or key file, with failure-path tests |
 | Tool-call ids exceed the 64-character cap OpenAI-compatible endpoints enforce | [#6933](https://github.com/tinyhumansai/openhuman/issues/6933) | Open; fix belongs in the tinyagents `CallId` |
 | Orchestrator sub-agent allowlist update never reaches the spawn tool | [#6934](https://github.com/tinyhumansai/openhuman/issues/6934) | Open |
 | Custom cloud providers gated behind a session in headless mode | Comment on [#6601](https://github.com/tinyhumansai/openhuman/issues/6601) | Awaiting maintainers |
