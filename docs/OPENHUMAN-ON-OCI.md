@@ -524,6 +524,8 @@ Licensing is not an obstacle in either direction: this repository is Apache-2.0,
 
 Figures 1 and 4 are drawn by `media/diagrams/figures.py` in the style of the OCI Architecture Diagram Toolkit, with Oracle's published service icons. Figures 2 and 3 are D2 sources in `media/diagrams/`, rendered by `media/diagrams/render.sh`. Product logos (OpenHuman, Model Context Protocol, Ollama, SearXNG, Playwright, Ubuntu, GitHub) are the owners' published artwork, used only to identify the products; sources and terms are listed in `media/logos/SOURCES.md`. All names and logos are trademarks of their respective owners.
 
+The Word and PDF editions of this document, with the cover, document control and contents pages, are built from this Markdown by `media/build-word.py` (`media/export-doc.sh` runs it together with the cover renderer).
+
 ## Appendix D. Glossary
 
 **MCP**: Model Context Protocol, the open protocol by which agents discover and call tools on servers. **Database Tools MCP Server**: OCI's managed, serverless MCP server for Oracle Database. **Resource principal**: an OCI identity for a service-managed resource. **Instance principal**: an OCI identity for a compute instance. **Identity domain**: OCI IAM's user, group and application directory. **Personal access token**: a user-bound OAuth token generated in the identity domain for an application. **Always Free**: OCI resources free of charge for the life of the tenancy within fixed allowances. **Prompt-guided tool dialect**: tool calling by textual markup parsed from the model's output rather than native function calling.

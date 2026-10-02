@@ -6,7 +6,7 @@ Generative AI**, agent access to **Oracle AI Database** through Oracle's managed
 **Database Tools MCP Server**, everything else on **Always Free** resources, all
 of it in Terraform.
 
-**Read the full architecture reference:** [`docs/OPENHUMAN-ON-OCI.md`](docs/OPENHUMAN-ON-OCI.md) (planes, flows, principals, findings, the clinical use case as observed).
+**Read the full architecture reference:** [`docs/OPENHUMAN-ON-OCI.md`](docs/OPENHUMAN-ON-OCI.md) (planes, flows, principals, findings, the clinical use case as observed). A Word edition with cover, document control and contents, and a PDF rendered from it, come out of `media/export-doc.sh`.
 
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Terraform](https://img.shields.io/badge/terraform-%3E%3D1.5-7B42BC.svg)](deploy/terraform)
