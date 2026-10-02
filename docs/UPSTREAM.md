@@ -26,6 +26,7 @@ build with CI), [#5444](https://github.com/tinyhumansai/openhuman/issues/5444)
 | Tool-call ids exceed the 64-char limit OpenAI-compatible endpoints enforce (69 chars) | issue [#6933](https://github.com/tinyhumansai/openhuman/issues/6933) | open; fix belongs in tinyagents `CallId` |
 | Orchestrator `subagents.allowlist` update not reflected in the spawn enum | issue [#6934](https://github.com/tinyhumansai/openhuman/issues/6934), PR [#6939](https://github.com/tinyhumansai/openhuman/pull/6939) | PR open |
 | Stale orchestrator iteration-cap snapshot breaking outside contributors' `rust-cov` lane | PR [#6937](https://github.com/tinyhumansai/openhuman/pull/6937) | **merged 2026-10-02** |
+| Show and tell post announcing the deployment, the reference document and the findings | [Discussion #6940](https://github.com/tinyhumansai/openhuman/discussions/6940) | posted 2026-10-02; asks maintainers about an OCI GenAI preset in tinyinference and opt-in native tool calling for `local-openai` |
 | BYOK without a TinyHumans session | comment on [#6601](https://github.com/tinyhumansai/openhuman/issues/6601#issuecomment-5952668753) with evidence and a minimal proposal | awaiting maintainer |
 | OCI GenAI provider preset, native embeddings | not filed | after the above land |
 | `local-openai` runtime: opt-in native tool calling for hosted OpenAI-compatible endpoints (profile is `PromptGuided`); `direct_tools` for registry-declared MCP servers | not filed | evidence from the research showcase in `docs/PILOT.md` |
