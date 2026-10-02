@@ -1,6 +1,6 @@
 # OpenHuman on OCI: reference architecture
 
-Status: living document. Based on OpenHuman docs and source as of v0.64.x (October 2026). The deployed pilot and its findings are in [`PILOT.md`](PILOT.md).
+Status: design document, the space of options and the target shape, based on OpenHuman docs and source as of v0.64.x (October 2026). What was actually built, measured and filed is the architecture reference, [`OPENHUMAN-ON-OCI.md`](OPENHUMAN-ON-OCI.md); the day-by-day notes are in [`PILOT.md`](PILOT.md). Where the pilot disagreed with this design, the finding is marked **Pilot result** inline and the design text is left so the reasoning stays visible.
 
 ## 0. User stories
 
@@ -29,10 +29,15 @@ credible ways to put it on OCI, and everything else follows from the choice.
 
 ### Shape A: personal core in your tenancy
 
-Run the published `ghcr.io/tinyhumansai/openhuman-core` container, one instance
-per user, on OKE or OCI Container Instances. The desktop app connects in external
-mode (`OPENHUMAN_CORE_RUN_MODE=external`) over a private path. Inference is BYOK
-to OCI Generative AI. Databases are reached through Oracle's managed MCP servers.
+Run the headless core, one instance per user, on a VM, OCI Container Instances
+or OKE. The desktop app connects in external mode
+(`OPENHUMAN_CORE_RUN_MODE=external`) over a private path. Inference is OCI
+Generative AI through its OpenAI-compatible endpoint. Databases are reached
+through Oracle's managed MCP servers.
+
+**Pilot result.** The published `ghcr.io/tinyhumansai/openhuman-core` image is
+amd64 only. On Ampere A1 the unit is the upstream release tarball on Ubuntu
+24.04 (it needs glibc 2.39); no build step.
 
 Pros: fast to stand up; matches the upstream DigitalOcean / Fly recipes; keeps
 the full feature set including the 118+ SaaS integrations.
@@ -41,6 +46,11 @@ Cons: the core still requires `BACKEND_URL` to reach `api.tinyhumans.ai` for
 sign-in, billing and teams. SaaS integrations run through Composio, a third-party
 broker that holds the OAuth tokens. Single bearer token per core, no per-user
 isolation inside one core.
+
+**Pilot result.** `BACKEND_URL` stays set but carries no credential and does
+no inference. A caller-owned local runtime (`local-openai`) pointed at OCI
+Generative AI needs no TinyHumans session at all; the native custom-provider
+route does (upstream #6601).
 
 ### Shape B: sovereign
 
@@ -67,29 +77,11 @@ results, is in [`PILOT.md`](PILOT.md).
 
 ## 2. Component mapping
 
-*As built in the pilot (Shape A); the design alternatives follow.*
+*As built in the pilot (Shape A on one Always Free VM). Every component below is described, measured and sourced in the architecture reference.*
 
 ![As built](../media/diagrams/architecture.png)
 
-```
-                 ┌──────────────────────── OCI tenancy ─────────────────────────┐
-                 │                                                               │
- Desktop app ────┼─ Load balancer (TLS, WAF,  ──► openhuman-core (per user)      │
- (external mode) │   path allowlist /rpc,/health)                                │
-                 │                                 │  workspace: Block Volume    │
-                 │                                 │  secrets: OCI Vault         │
-                 │                                 ├──► LiteLLM gateway ──► OCI GenAI
-                 │                                 │    (resource principal)  chat / embed / rerank
-                 │                                 ├──► Database Tools MCP Server ──► ADB / Base DB
-                 │                                 │    (OAuth2 via IAM Identity Domains)
-                 │                                 └──► NAT gateway (egress allowlist)
-                 │                                        │
-                 └────────────────────────────────────────┼────────────────────┘
-                                                          ▼
-                       api.tinyhumans.ai (auth/billing)  Composio  Smithery  search provider
-```
-
-Rendered view (GitHub renders this block):
+**Target design for phase three** (OKE, one core per user, in-tenancy gateway). GitHub renders this block:
 
 ```mermaid
 flowchart LR
@@ -99,14 +91,14 @@ flowchart LR
 
   subgraph oci[OCI tenancy]
     direction LR
-    bastion[Load balancer<br/>TLS + WAF + path allowlist<br/>private over VPN, or public for pilot]
-    subgraph okens[OKE or Container Instances, private subnet]
+    lb[Load balancer<br/>TLS + path allowlist<br/>private over VPN, or public with CIDR allowlist]
+    subgraph okens[OKE, private subnet]
       core1[openhuman-core<br/>user A]
       core2[openhuman-core<br/>user B]
-      llm[LiteLLM gateway<br/>resource principal]
+      llm[Inference gateway<br/>workload identity, signs as a resource principal]
     end
-    bv[(Block Volume<br/>per core: SQLite memory,<br/>Markdown vault, sessions)]
-    vault[(OCI Vault<br/>core token, master key,<br/>MCP tokens)]
+    fss[(File Storage or Block Volume<br/>per core: SQLite memory,<br/>Markdown vault, sessions)]
+    vault[(OCI Vault<br/>core tokens, keyring master keys,<br/>MCP tokens)]
     genai[OCI Generative AI<br/>chat / embeddings / rerank]
     dbtools[Database Tools<br/>MCP Server]
     adb[(Autonomous AI Database<br/>or Base DB)]
@@ -117,17 +109,17 @@ flowchart LR
     th[api.tinyhumans.ai<br/>sign-in, billing, teams]
     composio[Composio<br/>SaaS OAuth broker]
     reg[Smithery / MCP registry /<br/>skills catalogue]
-    search[Search provider]
+    search[SearXNG in-tenancy, or a search provider]
   end
 
-  app -- "HTTPS, bearer /rpc" --> bastion --> core1
-  bastion --> core2
-  core1 --- bv
-  core2 --- bv
+  app -- "HTTPS, bearer /rpc" --> lb --> core1
+  lb --> core2
+  core1 --- fss
+  core2 --- fss
   core1 -. "secrets at boot" .- vault
   core1 -- "OpenAI-compatible" --> llm -- "IAM signed" --> genai
   core2 --> llm
-  core1 -- "streamable HTTP MCP<br/>OAuth2 / PAT" --> dbtools --> adb
+  core1 -- "streamable HTTP MCP<br/>user token per core" --> dbtools --> adb
   core1 --> nat
   nat --> th
   nat --> composio
@@ -135,13 +127,18 @@ flowchart LR
   nat --> search
 ```
 
+The gateway box is conditional: it earns its place only where it can sign
+requests as a resource principal (OKE workload identity). Where it cannot, the
+pilot's arrangement stands: a Generative AI API key, itself a policy-governed
+principal, and local embeddings.
+
 ### 2.1 Compute
 
 | Option | When |
 | --- | --- |
-| OKE, one Deployment per user, PVC on Block Volume | Default. Many users, GitOps, External Secrets Operator for Vault |
-| OCI Container Instances, one per user | Simplest for a pilot of a handful of users |
-| Compute VM + systemd, standalone binary | Ampere A1 (upstream images are amd64 only, so build from source) |
+| OKE, one Deployment per user, PVC on Block Volume or File Storage | Many users, GitOps, External Secrets Operator for Vault. Worker nodes draw on the same A1 allowance, so not Always Free in practice |
+| OCI Container Instances, one per user | Simplest for a handful of users; not Always Free |
+| Compute VM + Docker Compose, release tarball on Ubuntu 24.04 | **The pilot.** Always Free on Ampere A1. Upstream container images are amd64 only; the aarch64 tarball needs glibc 2.39 and no build |
 
 Upstream sizing claim: a minimal build is a ~60 MiB stripped binary and hosts
 hundreds of agents on 2 vCPU / 2 GB. No GPU is required unless you run a local
@@ -157,7 +154,16 @@ IAM request signing.
 
 OpenHuman accepts a custom OpenAI-compatible provider registered under your own
 slug, and assigns providers per workload hint (`hint:reasoning`, `hint:fast`,
-`hint:vision`, `hint:summarize`, `hint:code`, `hint:burst`) in `config.toml`.
+`hint:vision`, `hint:summarize`, `hint:code`, `hint:burst`).
+
+**Pilot result.** In headless `serve` mode custom cloud providers are gated
+behind a TinyHumans session or API key (`SESSION_EXPIRED` on every turn).
+Caller-owned local runtimes are exempt, so the pilot registers OCI Generative AI
+as the `local-openai` runtime (`LOCAL_OPENAI_URL` plus `local_ai.api_key`) and
+pins every role to `local-openai:<model>@<temperature>` through the settings
+RPC. Hand-written `config.toml` entries do not route; only the RPC completes a
+provider route. Local-runtime profiles use a prompt-guided tool dialect, which
+is why the reliability recipe in the reference (section 10.3) exists.
 
 Two gaps make a gateway worthwhile:
 
@@ -167,22 +173,27 @@ Two gaps make a gateway worthwhile:
 2. **Static API keys.** OCI positions API keys for development and IAM for
    production. OpenHuman can only send a bearer.
 
-Recommended: run a LiteLLM proxy in-tenancy with resource-principal or instance-
-principal signing in front of OCI GenAI. OpenHuman then sees one OpenAI-
-compatible base URL and one slug for chat, embeddings and rerank, and no OCI
-credential ever lives in the OpenHuman workspace. Alternative for embeddings
-only: an Ollama sidecar serving `bge-m3`, which the upstream docs call out as the
-recommended local embedder.
+Design intent: an in-tenancy gateway signing as a resource principal in front
+of OCI GenAI, so that OpenHuman sees one OpenAI-compatible base URL for chat,
+embeddings and rerank and no OCI credential lives in the workspace.
 
-Suggested initial routing (adjust to the catalogue in your region):
+**Pilot result.** The LiteLLM proxy's OCI integration cannot sign with an
+instance principal today, so a gateway on the VM would have reintroduced a user
+API key. The pilot uses a Generative AI API key directly (it is a policy-governed
+principal, `request.principal.type='generativeaiapikey'`) and an Ollama sidecar
+serving `bge-m3` for embeddings, which the upstream docs call the recommended
+local embedder. Revisit the gateway on OKE, where workload identity can sign.
 
-| Hint | Model family |
-| --- | --- |
-| reasoning | gpt-5.x or grok-4 via OCI GenAI |
-| fast, burst | llama-3.3-70b-instruct or gpt-oss-120b |
-| vision | llama-4-scout-17b-16e-instruct |
-| summarize | cohere command-a or a fast tier |
-| embeddings | cohere.embed-v4.0 or embed-multilingual-v3.0 |
+Routing, with what the pilot measured on 2026-10-02:
+
+| Hint | Model family | Pilot result |
+| --- | --- | --- |
+| reasoning, chat, agentic | `openai.gpt-4.1` | Works through `local-openai`; the pilot's model for every role |
+| reasoning (stronger) | `openai.gpt-5`, `gpt-5.2`, `gpt-5.4`, `gpt-5.6-sol` | Reachable directly; fail through the harness, which sends `max_tokens` where these models require `max_completion_tokens` (tinyinference fix pending) |
+| reasoning (alternative) | `xai.grok-4` | 404 on the OpenAI-compatible endpoint in the pilot region |
+| fast, burst | `meta.llama-3.3-70b-instruct`, `openai.gpt-oss-120b` | Not exercised in the pilot |
+| vision | `meta.llama-4-scout-17b-16e-instruct` | Not exercised |
+| embeddings | `cohere.embed-v4.0` via a gateway only | Native API only; the pilot embeds with `bge-m3` on Ollama |
 
 ### 2.3 Oracle Database access for agents
 
@@ -191,7 +202,7 @@ and remote servers as `{ url, headers }` over streamable HTTP.
 
 | Server | Transport | Auth | Use |
 | --- | --- | --- | --- |
-| **OCI Database Tools MCP Server** (managed, serverless) | streamable HTTP | OAuth 2.0 via IAM Identity Domains, or personal access tokens; server runs as a resource principal to reach Database Tools connections and Vault wallets | **Default.** Zero cost, IAM RBAC, works with ADB, Base DB and on-prem via private endpoint |
+| **OCI Database Tools MCP Server** (managed, serverless) | streamable HTTP | User tokens: a personal access token from the identity domain (the pilot), or OAuth sign-in. Server runs as a resource principal to reach Database Tools connections and Vault secrets. **Pilot result:** a client-credentials token is accepted at the endpoint but IAM cannot authorise the caller (`-32007`); on-behalf-of with a trusted client is untested | **Default.** Zero cost, IAM RBAC, works with ADB, Base DB and on-prem via private endpoint |
 | **ORDS `/mcp` endpoint** | streaming HTTPS | OAuth2 / JWT | Shops that already run ORDS |
 | **SQLcl MCP Server** | stdio | saved SQLcl connections | Dev only. Needs Java and a wallet inside the container |
 
@@ -201,10 +212,10 @@ each user has their own core. This is another reason for the per-user shape.
 Run DB-facing agents at the `readonly` or `supervised` access tier so writes
 pause for approval.
 
-Verify before relying on it: whether OpenHuman's remote MCP client can complete
-an OAuth authorization-code flow headlessly, or only send static headers. If
-only headers, use a personal access token from the Identity Domain and rotate it
-through Vault.
+**Pilot result.** The remote MCP client sends static headers
+(`mcp_clients_config_set` with `url` and `headers`); there is no headless
+authorization-code flow. The pilot stores a personal access token in Vault and
+the VM registers the server from there; rotation is a new token and one script.
 
 ### 2.4 Memory and storage
 
@@ -215,7 +226,7 @@ the workspace directory. Upstream applies AES-256-GCM at rest keyed by Argon2id.
 | Concern | OCI answer |
 | --- | --- |
 | Persistence | One Block Volume (or File Storage export) per core, with a backup policy |
-| Encryption key | Seed the master key from OCI Vault at boot; headless Linux has no OS keychain, so OpenHuman falls back to an encrypted file |
+| Encryption key | Seed the master key from OCI Vault at boot. **Pilot result:** release 0.64.10 cannot take a master key from the environment and falls back to the plaintext file keyring (`OPENHUMAN_KEYRING_BACKEND=file`) on the encrypted volume; upstream PR #6935 adds `OPENHUMAN_KEYRING_MASTER_KEY`, the Terraform already keeps the key in Vault, and the renderer switches to `encrypted_file` on the first newer release |
 | Oracle AI Database as the memory store | Possible but partial. `tinymemory` admits external drivers (Supermemory, Mem0, Cognee, AgentMemory via REST) and ships a conformance suite. An Oracle AI Database 26ai driver (vector search plus Oracle Text for hybrid recall) is a bounded project. The Memory Tree chunk pipeline stays on local SQLite regardless, and the docs call the REST backend "not the recommended extension point". Phase 2, and do not promise "memory lives in Oracle DB" without a fork |
 
 ### 2.5 Secrets
@@ -226,7 +237,7 @@ the workspace directory. Upstream applies AES-256-GCM at rest keyed by Argon2id.
 | `OPENHUMAN_BACKEND_API_KEY` (Shape A only) | OCI Vault |
 | GenAI API key (only if no gateway) | OCI Vault, two-secret rotation |
 | MCP personal access tokens | OCI Vault |
-| Memory master key | OCI Vault |
+| Keyring and memory master key | OCI Vault (generated by Terraform, 64 hex) |
 
 OKE: External Secrets Operator with the OCI Vault provider. Container Instances:
 Vault secret references in the environment.
@@ -239,7 +250,7 @@ events stream carries agent activity. The core itself never gets a public IP.
 
 | Deployment | Client path |
 | --- | --- |
-| Pilot, users outside a corporate network | Public OCI Load Balancer with TLS, a WAF rate-limit rule on `/rpc`, and a **path allowlist that forwards only `/rpc` and `/health`**. The allowlist closes the unauthenticated streams without an upstream code change. Dictation over the network is lost; use the desktop app's local dictation instead |
+| Pilot, users outside a corporate network | Public OCI Load Balancer with TLS and a **path allowlist that forwards only `/rpc`, `/health` and `/events`** (the desktop app needs the event stream). **Pilot result:** `ALLOW` rule sets cannot match paths, so the allowlist is a path route set with an empty default backend set; a WAF rate-limit rule was not needed for one operator and is not Always Free. Dictation over the network is lost; use the desktop app's local dictation instead |
 | Oracle internal | Private OCI Load Balancer reached over the corporate VPN or FastConnect. Nothing public |
 | Admin / break-glass | OCI Bastion port-forward to the nodes or pods. Not the daily client path: sessions expire after three hours and need SSH |
 
@@ -256,8 +267,9 @@ destinations:
 | `api.tinyhumans.ai` | sign-in, billing, teams | removed |
 | Composio | OAuth brokering and tool proxying for SaaS integrations | removed |
 | Smithery and official MCP registry, skills catalogue | fetched at startup and cached hourly | optional |
-| Search provider (Exa, Brave, Tavily or self-hosted SearXNG) | web search | your choice |
-| OCI GenAI (via gateway) | inference | stays |
+| Search provider (Exa, Brave, Tavily) or self-hosted SearXNG (the pilot) | web search | your choice |
+| GitHub releases | core tarball at boot | stays, or mirror to Object Storage |
+| OCI GenAI (directly with an API key in the pilot; via a gateway on OKE) | inference | stays |
 
 Verify with VCN flow logs that BYOK chat really goes to OCI GenAI and not through
 the TinyHumans inference proxy.
@@ -268,14 +280,17 @@ Upstream sandboxes tool execution with Landlock, Bubblewrap, Firejail or Docker.
 Nested sandboxing inside a pod is awkward. Options: run the pod with the
 minimum privileges Landlock needs, or set the sandbox to policy-only and let
 the pod be the boundary while keeping DB-facing agents at `readonly` /
-`supervised`.
+`supervised`. **Pilot result:** the core container runs read-only with
+`cap_drop: ALL` plus the three capabilities its entrypoint needs; the browser
+runs isolated on the compose network only.
 
 ## 3. Things to be honest about
 
 - The project is weeks old at this scale and moves fast (dozens of merges per
   day). Pin image tags.
 - The headless core is explicitly single-user with no per-user isolation.
-- Upstream images are amd64 only.
+- Upstream container images are amd64 only; release tarballs exist for aarch64 and need glibc 2.39.
+- Local-runtime profiles use a prompt-guided tool dialect; tool-call reliability depends on the prompt recipe (reference, section 10.3) until native tool calling exists for hosted OpenAI-compatible endpoints.
 - GPL-3.0: fine for internal deployment; redistributing a modified core, or
   embedding it in a product you ship, triggers copyleft obligations.
 - Speech-to-text has no self-hosted path upstream. Web search needs your own
@@ -285,8 +300,9 @@ the pod be the boundary while keeping DB-facing agents at `readonly` /
 
 | Phase | Deliverable |
 | --- | --- |
-| 0 | This document reviewed. Decide pilot shape (A) and target compute (OKE vs Container Instances) |
-| 1 | Terraform / Resource Manager stack: VCN, private subnets, NAT with allowlist, load balancer with path allowlist, OKE or Container Instances, Block Volume per core, Vault, LiteLLM gateway with resource principal to OCI GenAI, Database Tools MCP Server over an ADB with a Database Tools connection and Vault wallet |
-| 1 demo | Desktop app in external mode. Prompt: "what changed in the ORDERS table this week, and remember the summary". Agent calls MCP run-sql, writes to memory, result visible in the Obsidian vault |
-| 2 | Upstream contributions (see `UPSTREAM.md`): OCI deploy recipe, `oci` provider preset, Oracle AI Database memory driver |
-| 3 | Shape B: embed-based service, own auth, no TinyHumans transport |
+| 0 | Done. Shape A; one Always Free VM instead of OKE or Container Instances, for cost and legibility |
+| 1 | Done 2026-10-01/02. Terraform stack: VCN, subnets, NAT, load balancer with path route set, A1 VM with Compose, block volume, Vault, Generative AI API key policy, Database Tools MCP Server over an ADB with a private endpoint. See the reference |
+| 1 demo | Done. Two recorded sessions: the platform tour and the clinical-trials research scenario. The governed-SQL scene waits on the operator's personal access token |
+| 2 | Under way (see `UPSTREAM.md`): three PRs merged, two open, three issues open, Discussion #6940; next: `oci` provider preset in tinyinference, native tool calling for `local-openai` |
+| 3 | OKE, one core per user, inference gateway with workload identity (Cohere embeddings and rerank behind the same URL), File Storage for workspaces |
+| 4 | Shape B: embed-based service, own auth, no TinyHumans transport |

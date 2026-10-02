@@ -2,7 +2,9 @@
 
 *By Federico Kamelhar, Senior Principal Architect, Agentic AI — Oracle*
 
-*Architecture reference, version 1.0, October 2026. Companion repository: [github.com/kamelhar/openhuman-oci](https://github.com/kamelhar/openhuman-oci).*
+*Architecture reference, version 1.1, October 2026. Companion repository: [github.com/kamelhar/openhuman-oci](https://github.com/kamelhar/openhuman-oci). The design space this pilot was narrowed from, with the alternatives and the target shape, is in [`ARCHITECTURE.md`](ARCHITECTURE.md); the day-by-day notes are in [`PILOT.md`](PILOT.md).*
+
+*Revision history. 1.0, 2026-10-02: first complete draft after the two recorded sessions. 1.1, 2026-10-02: figures redrawn with Oracle's icon set and the products' own logos; upstream merges recorded; keyring made release-ready; prerequisites, decisions and failure modes added.*
 
 ---
 
@@ -16,7 +18,7 @@ This document describes how we ran that core on Oracle Cloud Infrastructure (OCI
 2. **Governed access to Oracle Database.** Agents reach data only through the managed [Database Tools MCP Server](https://docs.oracle.com/en-us/iaas/database-tools/doc/working-database-tools-mcp-server.html), under OCI Identity and Access Management (IAM) policy and identity-domain application roles. No wallet, no connection string, no SQL driver inside the agent.
 3. **Everything else on Always Free.** One Ampere A1 virtual machine, one Autonomous AI Database, one flexible load balancer, a Vault, a Bastion, a log group: all within OCI's Always Free allowances. The only metered cost is Generative AI tokens.
 
-Everything is expressed in Terraform (56 resources in one root module) plus a boot script on the VM; `terraform apply` builds it in about twenty minutes and `terraform destroy` removes it, compartment included. The deployment was validated end to end on 2026-10-01 and 2026-10-02 against a personal pay-as-you-go tenancy, and two recorded sessions show it working: a 132-second tour of the platform and a 145-second clinical-research scenario in which the agent analyses 4,300 public Alzheimer's disease trials in the database, researches the leading sponsors on the live web with parallel sub-agents, writes a sourced brief on an approved drug from FDA pages, and reads it back from memory.
+Everything is expressed in Terraform (58 resources in one root module) plus a boot script on the VM; `terraform apply` builds it in about twenty minutes and `terraform destroy` removes it, compartment included. The deployment was validated end to end on 2026-10-01 and 2026-10-02 against a personal pay-as-you-go tenancy, and two recorded sessions show it working: a 132-second tour of the platform and a 145-second clinical-research scenario in which the agent analyses 4,300 public Alzheimer's disease trials in the database, researches the leading sponsors on the live web with parallel sub-agents, writes a sourced brief on an approved drug from FDA pages, and reads it back from memory.
 
 The work also produced nine upstream findings, filed as five issues and five pull requests on the OpenHuman repository; three of the pull requests were merged the same day. The effort is worth it because the pattern is harness-neutral: swap OpenHuman for any OpenAI-compatible agent harness that speaks the Model Context Protocol (MCP) and the OCI side does not change.
 
@@ -56,15 +58,33 @@ Two supporting stories ride on the same stack: a platform engineer who wants one
 
 **Governed by default.** Every hop has an identity and a policy: the client has a bearer token and a source CIDR; the VM has an instance principal that may only read secret bundles; the MCP server has a resource principal that may only use one connection; the connection may only read one secret; the GenAI API key is authorised by a policy on its principal type; the database accepts connections only from the VCN and the operator's address. There is no step where a credential sits in a file a human could copy out of a container.
 
-**Sovereign where it matters.** Prompts, tool results, memory and the database never leave the tenancy. The two egress paths that remain in this shape, the vendor's backend URL (reachable but unused) and the public web the agent researches, are enumerated and go through one NAT gateway.
+**Sovereign where it matters.** Prompts, tool results, memory and the database never leave the tenancy. What does leave is enumerated in section 4 and goes through one NAT gateway: the regional Generative AI endpoint, the public web the agent researches, the release download and catalogue refreshes at boot, and the vendor's backend URL, which is reachable but carries no credential and does no inference here.
 
-**Free to run, cheap to prove.** The architecture had to fit a personal account so that anyone can reproduce it. Always Free constraints were a forcing function for good decisions: one VM instead of a cluster, containers instead of services, a file keyring on an encrypted volume instead of a secret daemon.
+**Free to run, cheap to prove.** The architecture had to fit a personal account so that anyone can reproduce it. Always Free constraints were a forcing function for good decisions: one VM instead of a cluster, containers instead of services, a Vault-fed keyring instead of a secret daemon.
 
 **Reproducible from a clean tenancy.** Terraform owns every resource. The two things Terraform cannot do today, minting a Generative AI API key and generating a personal access token in the identity domain, are scripted or documented as single steps, and the VM reconciles its own configuration from Vault every two minutes so order of operations does not matter.
 
 **Harness-neutral.** OpenHuman-specific logic lives in one directory of VM assets. The network, identity, secrets, inference and database layers assume only an OpenAI-compatible client that speaks streamable-HTTP MCP.
 
 **Upstream over fork.** Every workaround points at an upstream issue that would retire it.
+
+### 2.1 Decisions, and the alternatives they displaced
+
+*Table 0. Where the design could have gone another way.*
+
+| Decision | Chosen | Not chosen | Why |
+| --- | --- | --- | --- |
+| Compute unit | One Ampere A1 VM with Docker Compose | OKE, Container Instances | OKE worker nodes draw on the same A1 allowance and Container Instances are not Always Free; one VM keeps the pilot free and legible. OKE is the phase-three shape |
+| Core binary | Upstream release tarball on Ubuntu 24.04 | Upstream container image, source build | The image is amd64 only; Debian bookworm's glibc is too old for the aarch64 tarball; a source build needs the Rust toolchain on a 3-OCPU VM |
+| Inference route | `local-openai` runtime pointed at OCI Generative AI | Native custom cloud provider (`byok-cloud`), in-tenancy gateway | The native route is gated behind a TinyHumans session; the gateway cannot sign with an instance principal today, so it would have reintroduced a user key; the API key is itself a policy-governed principal |
+| Embeddings | `bge-m3` on Ollama, on the VM | Cohere embeddings on OCI Generative AI | Embeddings and rerank are native-API only, unreachable by an OpenAI-compatible client; local embeddings cost nothing and keep memory in-tenancy |
+| Edge | Public flexible load balancer, path route set, empty default backend set | OCI WAF rules, private load balancer over VPN, Bastion as the client path | `ALLOW` rule sets cannot match paths; a WAF is more than one operator needs and is not Always Free; the private load balancer is the corporate-network shape; Bastion's three-hour sessions make it an admin tool |
+| Database access | Managed Database Tools MCP Server, personal access token | Client-credentials OAuth app, SQLcl MCP in the container, ORDS | Client-credentials tokens are accepted but cannot be authorised by IAM; SQLcl needs Java and a wallet inside the agent; ORDS is another deployment |
+| Database connectivity | One-way TLS, access list of VCN plus operator address, private endpoint | mTLS wallet | No wallet file anywhere; the private endpoint and service gateway let the access list recognise the VCN |
+| Secrets delivery | Timer-driven renderer using the instance principal | Secrets in cloud-init, baked into the image, Terraform provisioners | Nothing secret at creation; reconciliation makes order of operations irrelevant and absorbs the two secrets Terraform cannot mint |
+| Search | SearXNG container | Exa, Brave or Tavily keys | No vendor key, no account, in-tenancy |
+| Browser | Playwright MCP container, isolated profile | The core's built-in browser tools | The built-in tools bind to the desktop shell's embedded Chromium |
+| Keyring | `auto`: file on 0.64.10, `encrypted_file` with a Vault master key afterwards | Always the file keyring | The release gate lets the same Terraform serve both releases without an operator decision |
 
 ---
 
@@ -183,7 +203,7 @@ allow any-user to use generative-ai-family in compartment <c>
   where ALL {request.principal.type='generativeaiapikey'}
 ```
 
-and a script mints the key with the CLI, because the Terraform provider has no resource for it yet. The create call requires an expiry per key and returns the secret only once (`.data.keys[0].key`); the script stores it straight into the Vault secret and never prints it. Two named keys allow zero-downtime rotation.
+and a script mints the key with the CLI, because the Terraform provider has no resource for it yet. The create call requires an expiry per key and returns the secret only once (`.data.keys[0].key`); the script stores it straight into the Vault secret and never prints it. It creates two named keys with a one-year expiry so one can be rotated while the other serves.
 
 Embeddings and rerank are **not** on the OpenAI-compatible path; they are native-API only. That is why embeddings run locally on Ollama in this shape. An in-tenancy gateway such as LiteLLM with resource-principal signing would put Cohere embeddings and rerank behind the same OpenAI-compatible URL, and is the reference design's recommendation for the OKE phase. It is not in the pilot because the gateway's proxy configuration cannot use instance principals, which would have reintroduced a user API key.
 
@@ -406,6 +426,8 @@ The demo driver encodes all five. The full prompt set is in the repository.
 
 ## 13. Operating the deployment
 
+**Prerequisites.** A tenancy with an identity domain, because the MCP server's application roles live there, and an operator who is an identity-domain user. Unused Always Free allowance: 3 of the 4 Ampere A1 OCPUs and 18 of the 24 GB, one of the two Autonomous Databases, 100 of the 200 GB of block storage, the one flexible load balancer. A1 capacity in the home region is the usual stumbling block: an apply that fails with `Out of host capacity` is retried later or in another availability domain. Generative AI must be available in a subscribed region (us-chicago-1 in the pilot; the home region may differ). Terraform 1.5 or newer with the OCI provider 9.8, the OCI CLI with an API-key profile for the key-minting script, an SSH key for Bastion, and the operator's current public address for the allowlists, which on some corporate networks changes daily. The pilot was validated on a personal pay-as-you-go tenancy; the account check that preceded it is in `PILOT-ACCOUNT-VALIDATION.md`.
+
 **Build.** `00-preflight.sh`; `terraform init && apply`; `01-genai-api-key.sh`; `02-trust-lb-cert.sh` on the client; generate the personal access token in the identity-domain console and `03-register-mcp.sh tokens.tok`; seed data from inside the VCN (`sql-vm.sh` or the seed script on the VM). A clean `terraform plan` is the acceptance test; three provider drifts (Always Free reporting zero cores, group schema extensions, the reserved IP's attachment) are silenced with documented `ignore_changes`.
 
 **Verify.** `/health` 200 through the load balancer, `/rpc` 401 without the token, `openhuman.inference_agent_chat_simple` answering, the renderer's journal reporting model settings pushed and MCP servers registered.
@@ -417,6 +439,26 @@ The demo driver encodes all five. The full prompt set is in the repository.
 **Record.** `deploy/scripts/demo.sh` and `demo-research.sh` are the two scripted sessions; `vhs` records them, `media/assemble*.sh` cut the films. Pacing is a variable because a 45-second raw run is unreadable; the released films run at twice the natural pace with line-by-line reveals.
 
 **Tear down.** `terraform destroy`; the compartment is created with `enable_delete`. The GenAI API key and the identity-domain token are outside state and are revoked in the console.
+
+### 13.1 Failure modes and recovery
+
+*Table 8b. What breaks, what it takes with it, and the way back.*
+
+| Event | Effect | Recovery |
+| --- | --- | --- |
+| VM instance lost or replaced (host failure, `terraform taint`) | Core down; the block volume and everything on it survive | `terraform apply` recreates the instance; cloud-init re-runs the bootstrap; the renderer restores configuration within about five minutes (three after boot, then every two). Memory, sessions and models return with the volume |
+| Block volume lost | Memory, sessions, Ollama model gone | The pilot has no backup policy; attach an OCI backup policy to the volume for anything beyond a demo |
+| Always Free A1 instance reclaimed for idleness (OCI may reclaim instances whose CPU, network and memory all stay under 20 percent for seven days) | VM gone, volume intact | Re-apply. A pilot left idle for a week should expect it |
+| Always Free Autonomous Database auto-stopped after seven days without connections, terminated after three months stopped | MCP SQL calls fail until the database starts; everything else runs | Start it from the console or CLI; the dataset survives a stop. A terminated database needs a re-apply and a re-seed |
+| GenAI API key expires (one year by default) or is revoked | Every chat turn fails with 401 | Run `01-genai-api-key.sh` again; the Vault update reaches the core within two minutes |
+| MCP personal access token expires | `oracle-db` MCP calls fail; the rest works | Generate a new token, run `03-register-mcp.sh` |
+| Load balancer leaf certificate expires (one year; the CA three) | Clients reject TLS | `terraform apply` replaces it; set `early_renewal_hours` on the certificate to rotate ahead of time; re-run `02-trust-lb-cert.sh` only if the CA changed |
+| Operator's public address changes | Connections to the load balancer time out; direct SQL is refused | Update `allowed_client_cidrs` and apply: seconds for the security group, about a minute for the database access list |
+| Bastion session expires (three hours) | Admin SSH drops | Create a new session; the client path is unaffected |
+| GitHub unreachable or the release removed at boot | Bootstrap cannot build the image on a new VM | Only boot fetches the tarball; running VMs are unaffected. Pin `openhuman_version` to a known release, or mirror the tarball to Object Storage |
+| Search engines rate-limit the NAT address | Web search returns few results | SearXNG rotates across engines; add engines in `searxng-settings.yml` or a keyed provider |
+| Generative AI regional outage, model retirement | Chat turns fail | Change `genai_chat_model` or `genai_region` and apply; on an existing VM edit `bootstrap.env` to match, because cloud-init changes are ignored; the renderer re-pins the roles within two minutes |
+| Core crash loop | No answers; `/health` fails at the load balancer | Compose restarts it; the renderer waits for health before pushing settings; `docker logs openhuman-core` through Bastion names the cause |
 
 ---
 
