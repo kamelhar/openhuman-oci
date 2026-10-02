@@ -22,6 +22,8 @@ services:
       TMPDIR: /tmp
     volumes:
       - /opt/openhuman/data/workspace:/home/openhuman/.openhuman
+      # Writable agent projects dir under read_only. Upstream fix merged (tinyhumansai/openhuman#6925,
+      # PR #6928, 2026-10-02); keep until a release newer than 0.64.10 ships it.
       - /opt/openhuman/data/projects:/home/openhuman/OpenHuman
     mem_limit: 6g
     cpus: 2.0

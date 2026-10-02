@@ -20,11 +20,12 @@ build with CI), [#5444](https://github.com/tinyhumansai/openhuman/issues/5444)
 
 | Item | Upstream | State |
 | --- | --- | --- |
-| Compose: writable projects volume under `read_only` | issue [#6925](https://github.com/tinyhumansai/openhuman/issues/6925), PR [#6928](https://github.com/tinyhumansai/openhuman/pull/6928) | open |
-| Docs: glibc floor, headless without account, container keyring, OCI recipe | issue [#6927](https://github.com/tinyhumansai/openhuman/issues/6927), PR [#6929](https://github.com/tinyhumansai/openhuman/pull/6929) | open |
+| Compose: writable projects volume under `read_only` | issue [#6925](https://github.com/tinyhumansai/openhuman/issues/6925), PR [#6928](https://github.com/tinyhumansai/openhuman/pull/6928) | **merged 2026-10-02**; ships in the release after v0.64.10; our compose keeps the volume until then |
+| Docs: glibc floor, headless without account, container keyring, OCI recipe | issue [#6927](https://github.com/tinyhumansai/openhuman/issues/6927), PR [#6929](https://github.com/tinyhumansai/openhuman/pull/6929) | **merged 2026-10-02** |
 | Keyring master key injection for headless (`OPENHUMAN_KEYRING_MASTER_KEY`) | issue [#6926](https://github.com/tinyhumansai/openhuman/issues/6926), PR [#6935](https://github.com/tinyhumansai/openhuman/pull/6935) | PR open: `OPENHUMAN_KEYRING_MASTER_KEY` / `_FILE` in the encrypted_file backend, with failure-path tests |
 | Tool-call ids exceed the 64-char limit OpenAI-compatible endpoints enforce (69 chars) | issue [#6933](https://github.com/tinyhumansai/openhuman/issues/6933) | open; fix belongs in tinyagents `CallId` |
-| Orchestrator `subagents.allowlist` update not reflected in the spawn enum | issue [#6934](https://github.com/tinyhumansai/openhuman/issues/6934) | open |
+| Orchestrator `subagents.allowlist` update not reflected in the spawn enum | issue [#6934](https://github.com/tinyhumansai/openhuman/issues/6934), PR [#6939](https://github.com/tinyhumansai/openhuman/pull/6939) | PR open |
+| Stale orchestrator iteration-cap snapshot breaking outside contributors' `rust-cov` lane | PR [#6937](https://github.com/tinyhumansai/openhuman/pull/6937) | **merged 2026-10-02** |
 | BYOK without a TinyHumans session | comment on [#6601](https://github.com/tinyhumansai/openhuman/issues/6601#issuecomment-5952668753) with evidence and a minimal proposal | awaiting maintainer |
 | OCI GenAI provider preset, native embeddings | not filed | after the above land |
 | `local-openai` runtime: opt-in native tool calling for hosted OpenAI-compatible endpoints (profile is `PromptGuided`); `direct_tools` for registry-declared MCP servers | not filed | evidence from the research showcase in `docs/PILOT.md` |

@@ -156,7 +156,7 @@ Short version; details and evidence in [`docs/PILOT.md`](docs/PILOT.md).
 | Phase | State |
 | --- | --- |
 | 1. Always Free pilot on one VM | deployed, see `docs/PILOT.md` |
-| 2. Upstream contributions | started: issues #6925, #6926, #6927 and PRs #6928, #6929, #6935 open on tinyhumansai/openhuman; tracker in `docs/UPSTREAM.md` |
+| 2. Upstream contributions | under way: PRs #6928, #6929 and #6937 merged on tinyhumansai/openhuman (2026-10-02); #6935 (keyring master key) and #6939 (sub-agent allowlist) open; issues #6926, #6933, #6934 open; tracker in `docs/UPSTREAM.md` |
 | 3. OKE variant with one core per user and an in-tenancy inference gateway | designed in `docs/ARCHITECTURE.md`, not started |
 | 4. Sovereign build on `openhuman-embed` with no TinyHumans backend | designed, not started |
 

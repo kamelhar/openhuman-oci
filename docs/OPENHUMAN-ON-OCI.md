@@ -18,7 +18,7 @@ This document describes how we ran that core on Oracle Cloud Infrastructure (OCI
 
 Everything is expressed in Terraform (56 resources in one root module) plus a boot script on the VM; `terraform apply` builds it in about twenty minutes and `terraform destroy` removes it, compartment included. The deployment was validated end to end on 2026-10-01 and 2026-10-02 against a personal pay-as-you-go tenancy, and two recorded sessions show it working: a 132-second tour of the platform and a 145-second clinical-research scenario in which the agent analyses 4,300 public Alzheimer's disease trials in the database, researches the leading sponsors on the live web with parallel sub-agents, writes a sourced brief on an approved drug from FDA pages, and reads it back from memory.
 
-The work also produced nine upstream findings, five of them filed as issues and three as pull requests on the OpenHuman repository, because the pattern is harness-neutral: swap OpenHuman for any OpenAI-compatible agent harness that speaks the Model Context Protocol (MCP) and the OCI side does not change.
+The work also produced nine upstream findings, filed as five issues and five pull requests on the OpenHuman repository; three of the pull requests were merged the same day. The effort is worth it because the pattern is harness-neutral: swap OpenHuman for any OpenAI-compatible agent harness that speaks the Model Context Protocol (MCP) and the OCI side does not change.
 
 ---
 
@@ -158,9 +158,9 @@ Docker Compose runs four services on an internal network; only the core publishe
 
 Two choices here came from failures.
 
-**glibc.** Upstream publishes a prebuilt aarch64 core with every release, which removes the need for a Rust build. That binary is linked against glibc 2.39. The runtime stage of upstream's own Dockerfile is Debian bookworm, whose glibc is 2.36; wrapping the tarball in it dies at exec with `GLIBC_2.39 not found`. The x86_64 tarball needs only 2.34. Ubuntu 24.04 is the base here, and the fact is now in upstream's deployment docs (PR #6929).
+**glibc.** Upstream publishes a prebuilt aarch64 core with every release, which removes the need for a Rust build. That binary is linked against glibc 2.39. The runtime stage of upstream's own Dockerfile is Debian bookworm, whose glibc is 2.36; wrapping the tarball in it dies at exec with `GLIBC_2.39 not found`. The x86_64 tarball needs only 2.34. Ubuntu 24.04 is the base here, and the fact is now in upstream's deployment docs (PR #6929, merged 2026-10-02).
 
-**Projects directory.** Upstream's compose file runs the container read-only and mounts only the workspace. The core creates `~/OpenHuman/projects` at start as its default action sandbox, which fails with `EROFS` and leaves file tools with no writable directory. A second volume at `/home/openhuman/OpenHuman` fixes it; that is PR #6928.
+**Projects directory.** Upstream's compose file runs the container read-only and mounts only the workspace. The core creates `~/OpenHuman/projects` at start as its default action sandbox, which fails with `EROFS` and leaves file tools with no writable directory. A second volume at `/home/openhuman/OpenHuman` fixes it; that is PR #6928, merged upstream on 2026-10-02 and part of the next release after 0.64.10.
 
 ### 5.3 Secrets and configuration without an operator
 
@@ -239,7 +239,7 @@ Two details about MCP tools in this core. They are *deferred*: not in the model'
 
 **Memory.** `memory_store` and `memory_recall` tools over the memory tree, with embeddings from Ollama's `bge-m3`. Stored briefs are listed back by the `memory_recall_memories` RPC with their URLs. The agent-side `memory_recall` tool returned empty for the same facts in every test, with or without a topic; the likely cause is that semantic recall needs embeddings the background indexer has not produced yet, and some background services stay deferred without a TinyHumans session. The demos therefore try the agent's recall first and fall back to reading the stored note through the RPC. It is an open question for upstream.
 
-**Sub-agents.** The core ships an orchestrator with a fixed delegation allowlist (ten built-in agents). Registering a custom `researcher` agent through the registry works, and updating the orchestrator's `subagents.allowlist` through `agent_registry_update` persists, but the `spawn_async_subagent` tool's allowed ids are compiled from the default definition and never change, even after a restart (issue #6934). The team-coordination RPCs (`agent_team_*`) start a worker but expect the worker to claim and complete tasks on its own, which the researcher did not. The fan-out that works today runs one agent turn per topic in parallel from the client and synthesises in a fourth turn; it is honest about what it is and it is fast: three researchers in 13 to 14 seconds.
+**Sub-agents.** The core ships an orchestrator with a fixed delegation allowlist (ten built-in agents). Registering a custom `researcher` agent through the registry works, and updating the orchestrator's `subagents.allowlist` through `agent_registry_update` persists, but the `spawn_async_subagent` tool's allowed ids are compiled from the default definition and never change, even after a restart (issue #6934; fix proposed in PR #6939). The team-coordination RPCs (`agent_team_*`) start a worker but expect the worker to claim and complete tasks on its own, which the researcher did not. The fan-out that works today runs one agent turn per topic in parallel from the client and synthesises in a fourth turn; it is honest about what it is and it is fast: three researchers in 13 to 14 seconds.
 
 ---
 
@@ -425,15 +425,17 @@ Everything the deployment found that belongs to OpenHuman rather than to this re
 
 | Finding | Where | Status |
 | --- | --- | --- |
-| Compose `read_only` root leaves the agent projects directory uncreatable | [#6925](https://github.com/tinyhumansai/openhuman/issues/6925), PR [#6928](https://github.com/tinyhumansai/openhuman/pull/6928) | Open |
-| Docs: glibc floor of release tarballs, headless without an account, container keyring, OCI recipe | [#6927](https://github.com/tinyhumansai/openhuman/issues/6927), PR [#6929](https://github.com/tinyhumansai/openhuman/pull/6929) | Open |
+| Compose `read_only` root leaves the agent projects directory uncreatable | [#6925](https://github.com/tinyhumansai/openhuman/issues/6925), PR [#6928](https://github.com/tinyhumansai/openhuman/pull/6928) | Merged 2026-10-02; in the next release after 0.64.10 |
+| Docs: glibc floor of release tarballs, headless without an account, container keyring, OCI recipe | [#6927](https://github.com/tinyhumansai/openhuman/issues/6927), PR [#6929](https://github.com/tinyhumansai/openhuman/pull/6929) | Merged 2026-10-02 |
 | Headless keyring master key cannot be injected | [#6926](https://github.com/tinyhumansai/openhuman/issues/6926), PR [#6935](https://github.com/tinyhumansai/openhuman/pull/6935) | Open; env var or key file, with failure-path tests |
 | Tool-call ids exceed the 64-character cap OpenAI-compatible endpoints enforce | [#6933](https://github.com/tinyhumansai/openhuman/issues/6933) | Open; fix belongs in the tinyagents `CallId` |
-| Orchestrator sub-agent allowlist update never reaches the spawn tool | [#6934](https://github.com/tinyhumansai/openhuman/issues/6934) | Open |
+| Orchestrator sub-agent allowlist update never reaches the spawn tool | [#6934](https://github.com/tinyhumansai/openhuman/issues/6934), PR [#6939](https://github.com/tinyhumansai/openhuman/pull/6939) | PR open |
 | Custom cloud providers gated behind a session in headless mode | Comment on [#6601](https://github.com/tinyhumansai/openhuman/issues/6601) | Awaiting maintainers |
 | `openai.`-prefixed reasoning models get `max_tokens` instead of `max_completion_tokens` | Not yet filed (tinyinference) | Reproduced |
 | Agent `memory_recall` empty while the RPC lists the note | Not yet filed | Reproduced |
 | OCI Generative AI provider preset and native embeddings | Not yet filed (tinyinference) | Planned after the above |
+
+A tenth change, outside this list, fixed a test snapshot on upstream's main that was failing every outside contributor's CI run (PR #6937, merged the same day).
 
 Licensing is not an obstacle in either direction: this repository is Apache-2.0, OpenHuman is GPL-3.0 and takes external pull requests without a CLA, and the repository downloads the upstream binary at deploy time rather than vendoring code.
 
