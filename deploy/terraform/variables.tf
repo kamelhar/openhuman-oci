@@ -91,6 +91,22 @@ variable "openhuman_version" {
   default     = "0.64.10"
 }
 
+variable "keyring_backend" {
+  description = <<-EOT
+    How the core stores provider keys. "auto" (default) picks encrypted_file with the
+    Vault-held master key on any release newer than 0.64.10 (the first release that
+    carries upstream PR #6935, OPENHUMAN_KEYRING_MASTER_KEY) and the plaintext file
+    keyring on 0.64.10, which has no way to receive a master key. "file" and
+    "encrypted_file" force one or the other.
+  EOT
+  type        = string
+  default     = "auto"
+  validation {
+    condition     = contains(["auto", "file", "encrypted_file"], var.keyring_backend)
+    error_message = "keyring_backend must be auto, file or encrypted_file."
+  }
+}
+
 variable "vm_assets_base_url" {
   description = "Base URL the VM downloads its bootstrap assets from (deploy/vm in this repo)."
   type        = string

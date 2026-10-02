@@ -34,19 +34,21 @@ resource "oci_core_instance" "core" {
   metadata = {
     ssh_authorized_keys = var.ssh_public_key
     user_data = base64encode(templatefile("${path.module}/templates/cloud-init.yaml.tftpl", {
-      assets_base_url        = "${var.vm_assets_base_url}/${var.vm_assets_ref}/deploy/vm"
-      openhuman_version      = var.openhuman_version
-      oci_region             = var.region
-      genai_inference_url    = local.genai_inference_url
-      genai_chat_model       = var.genai_chat_model
-      genai_temperature      = var.genai_temperature
-      inference_mode         = var.inference_mode
-      tinyhumans_backend_url = var.tinyhumans_backend_url
-      secret_core_token      = oci_vault_secret.core_token.id
-      secret_genai_api_key   = oci_vault_secret.genai_api_key.id
-      secret_tinyhumans_key  = oci_vault_secret.tinyhumans_api_key.id
-      secret_mcp_user_token  = oci_vault_secret.mcp_user_token.id
-      mcp_endpoint           = oci_database_tools_database_tools_mcp_server.adb.endpoints[0].endpoint
+      assets_base_url           = "${var.vm_assets_base_url}/${var.vm_assets_ref}/deploy/vm"
+      openhuman_version         = var.openhuman_version
+      oci_region                = var.region
+      genai_inference_url       = local.genai_inference_url
+      genai_chat_model          = var.genai_chat_model
+      genai_temperature         = var.genai_temperature
+      inference_mode            = var.inference_mode
+      tinyhumans_backend_url    = var.tinyhumans_backend_url
+      secret_core_token         = oci_vault_secret.core_token.id
+      secret_genai_api_key      = oci_vault_secret.genai_api_key.id
+      secret_tinyhumans_key     = oci_vault_secret.tinyhumans_api_key.id
+      secret_mcp_user_token     = oci_vault_secret.mcp_user_token.id
+      secret_keyring_master_key = oci_vault_secret.keyring_master_key.id
+      keyring_backend           = var.keyring_backend
+      mcp_endpoint              = oci_database_tools_database_tools_mcp_server.adb.endpoints[0].endpoint
     }))
   }
 

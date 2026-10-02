@@ -222,7 +222,7 @@ def architecture():
     c.group(560, 150, 555, 265, "Ampere A1 Flex VM · 3 OCPU / 18 GB · Ubuntu 24.04 · Docker Compose", fill=MIST, stroke=OCEAN, dash=None, label_size=12.5)
     c.icon(OCI + "flex-vm.png", 590, 158, 34)
     c.card(575, 190, 180, 150, "openhuman-core", "openhumanlogo-black.svg", 44,
-           "upstream aarch64 release\nJSON-RPC :7788\nkeyring=file · local-openai")
+           "upstream aarch64 release\nJSON-RPC :7788\nlocal-openai mode")
     # tools group
     c.rect(775, 188, 325, 154, fill=WHITE, stroke=NEUTRAL3, width=1.5, radius=8, dash=4)
     c.ctext(937, 193, "compose network only · never published", size=10, color=GREY_TEXT)

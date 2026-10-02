@@ -81,10 +81,10 @@ The deployment has six planes. Table 1 maps each to its OCI services and to the 
 | Compute and runtime | Ampere A1 Flex VM (3 OCPU, 18 GB), Ubuntu 24.04 aarch64, 50 GB boot volume, 50 GB block volume, cloud-init | `compute.tf`: instance, volume, attachment, image lookup |
 | Inference | OCI Generative AI in us-chicago-1, API key authorised by IAM policy | `identity.tf` (policy statement), `deploy/scripts/01-genai-api-key.sh` (key) |
 | Data | Autonomous AI Database 26ai (Always Free), Database Tools private endpoint, connection, managed MCP Server | `database.tf`, `dbtools.tf`, `mcp_roles.tf` |
-| Identity and secrets | Compartment, identity-domain group and app-role grant, dynamic group, one policy, Vault with software key and five secrets | `compartment.tf`, `identity.tf`, `vault.tf` |
+| Identity and secrets | Compartment, identity-domain group and app-role grant, dynamic group, one policy, Vault with software key and six secrets | `compartment.tf`, `identity.tf`, `vault.tf` |
 | Operations | Bastion, log group with the MCP invoke service log | `bastion.tf`, `logging.tf` |
 
-The Terraform state holds 63 entries: 56 managed resources and 7 data sources. A full apply from an empty compartment takes about twenty minutes, dominated by the Autonomous Database (about three minutes), the load balancer (about four) and the Database Tools private endpoint (about six).
+The Terraform state holds 65 entries: 58 managed resources and 7 data sources. A full apply from an empty compartment takes about twenty minutes, dominated by the Autonomous Database (about three minutes), the load balancer (about four) and the Database Tools private endpoint (about six).
 
 ### 3.1 Request flows
 
@@ -164,9 +164,9 @@ Two choices here came from failures.
 
 ### 5.3 Secrets and configuration without an operator
 
-The VM never receives a secret at creation. `render_config.py`, run by a systemd timer every two minutes, authenticates to Vault with the instance principal, reads the five secrets, writes the core's environment file, restarts the core only when that file changed, and then pushes the agent's settings through the core's own JSON-RPC. That last step exists because of a finding about the core.
+The VM never receives a secret at creation. `render_config.py`, run by a systemd timer every two minutes, authenticates to Vault with the instance principal, reads the six secrets, writes the core's environment file, restarts the core only when that file changed, and then pushes the agent's settings through the core's own JSON-RPC. That last step exists because of a finding about the core.
 
-**Headless keyring.** In production mode the core stores provider keys with an `encrypted_file` keyring whose master key it loads from the operating system keychain. A container has no keychain, the core logs `master key unavailable — cannot store secrets`, and the first settings write fails with `Failed to encrypt api_key`. Upstream has no way to inject that master key. The pilot runs `OPENHUMAN_KEYRING_BACKEND=file`, which keeps the provider key in a plaintext JSON file on the block volume (encrypted at rest by OCI, mode 0600, private subnet). Issue #6926 asks for an environment-variable master key and PR #6935 implements it (`OPENHUMAN_KEYRING_MASTER_KEY` or a key file); until it ships, the VM is the secret boundary and the security section says so.
+**Headless keyring.** In production mode the core stores provider keys with an `encrypted_file` keyring whose master key it loads from the operating system keychain. A container has no keychain, the core logs `master key unavailable — cannot store secrets`, and the first settings write fails with `Failed to encrypt api_key`. Release 0.64.10 has no way to inject that master key, so on it the deployment runs `OPENHUMAN_KEYRING_BACKEND=file`, which keeps the provider key in a plaintext JSON file on the block volume (encrypted at rest by OCI, mode 0600, private subnet), and the VM is the secret boundary. Issue #6926 asked for an environment-variable master key and PR #6935 adds it (`OPENHUMAN_KEYRING_MASTER_KEY`, 64 hex characters, or `OPENHUMAN_KEYRING_MASTER_KEY_FILE`). The deployment is already built for it: Terraform generates a 32-byte master key into Vault, and the renderer switches to `encrypted_file` with that key on any release newer than 0.64.10, or when `keyring_backend = "encrypted_file"` is set. Upgrading is one variable change; the renderer re-pushes the provider keys after the switch, so nothing has to be migrated by hand.
 
 **BYOK is completed by the core, not by a file.** Hand-writing an `inference_url` and `api_key` into the core's TOML does not route: the core only completes a custom-provider route (registers the provider, pins the roles) inside its settings-update RPC. The renderer therefore calls `openhuman.config_update_model_settings` and `openhuman.config_update_local_ai_settings` rather than editing TOML, and keeps a hash of what it pushed so the calls are idempotent.
 
@@ -308,8 +308,9 @@ A log group with the Database Tools MCP server's `invoke` service log is part of
 | GenAI API key | `01-genai-api-key.sh` (placeholder from Terraform) | Renderer, then the core's `local-openai` bearer | Script creates a new key; revoke the old in the console |
 | MCP user token | `03-register-mcp.sh` (placeholder from Terraform) | Renderer, then the core's `oracle-db` MCP header | Generate a new token, re-run the script |
 | TinyHumans API key | Optional Terraform variable | Only in `byok-cloud` mode | Terraform |
+| Keyring master key | Terraform (`random_id`, 64 hex) | The core's `encrypted_file` keyring on releases newer than 0.64.10 | Taint and apply; the renderer restarts the core and re-pushes the provider keys |
 
-Terraform state contains the generated values and must be treated as a secret. Inside the core, provider keys sit in the file keyring on the encrypted block volume until upstream merges the master-key injection (issue #6926, PR #6935).
+Terraform state contains the generated values and must be treated as a secret. Inside the core, provider keys sit in the file keyring on the encrypted block volume on release 0.64.10, and in the `encrypted_file` keyring under the Vault-held master key on every later release (issue #6926, PR #6935).
 
 ---
 
@@ -381,7 +382,7 @@ The demo driver encodes all five. The full prompt set is in the repository.
 
 **Not exposed.** The VM (no public IP), the database (VCN access list, private-endpoint path), SearXNG and the browser (compose network only; a browser that any client could drive is a proxy into the tenancy), Vault, the MCP server (public endpoint, but IAM plus app roles plus a user token).
 
-**Residual risks, stated.** Provider keys in the file keyring on the VM until PR #6935 lands; the core token as a single credential for full control of one user's core; the browser is a general-purpose web client under the agent's control, which is why it runs `--isolated` and why the agent's sandbox tier for file and shell tools should stay at read-only or supervised for database-facing work; the agent's textual tool dialect, which can be steered by prompt injection in fetched pages, is screened by the core's prompt-injection scanner but is a reason to keep `tool_allowlist`s tight on sub-agents.
+**Residual risks, stated.** Provider keys in the plaintext file keyring on the VM while it runs release 0.64.10 (the next release moves them under the Vault-held master key automatically); the core token as a single credential for full control of one user's core; the browser is a general-purpose web client under the agent's control, which is why it runs `--isolated` and why the agent's sandbox tier for file and shell tools should stay at read-only or supervised for database-facing work; the agent's textual tool dialect, which can be steered by prompt injection in fetched pages, is screened by the core's prompt-injection scanner but is a reason to keep `tool_allowlist`s tight on sub-agents.
 
 **Data classification.** The clinical dataset is public registry metadata. Protected health information must never enter this system; the use case was chosen to make that true structurally, not by instruction.
 
@@ -409,6 +410,8 @@ The demo driver encodes all five. The full prompt set is in the repository.
 
 **Verify.** `/health` 200 through the load balancer, `/rpc` 401 without the token, `openhuman.inference_agent_chat_simple` answering, the renderer's journal reporting model settings pushed and MCP servers registered.
 
+**Upgrade the core.** Set `openhuman_version` to the new release (and `keyring_backend` only if you want to force a mode), apply, then on an existing VM edit `/opt/openhuman/bootstrap.env` to match (cloud-init changes are ignored on purpose) and re-run `bootstrap.sh`; it rebuilds the image from the new tarball and the renderer applies the keyring mode that release supports.
+
 **Operate.** Bastion port-forward to the VM for logs (`/var/log/openhuman-bootstrap.log`, `docker logs openhuman-core`, `journalctl -u openhuman-render.service`); the renderer reconciles Vault changes within two minutes; a change to VM assets is a push to `main` plus a re-run of `bootstrap.sh`.
 
 **Record.** `deploy/scripts/demo.sh` and `demo-research.sh` are the two scripted sessions; `vhs` records them, `media/assemble*.sh` cut the films. Pacing is a variable because a 45-second raw run is unreadable; the released films run at twice the natural pace with line-by-line reveals.
@@ -427,7 +430,7 @@ Everything the deployment found that belongs to OpenHuman rather than to this re
 | --- | --- | --- |
 | Compose `read_only` root leaves the agent projects directory uncreatable | [#6925](https://github.com/tinyhumansai/openhuman/issues/6925), PR [#6928](https://github.com/tinyhumansai/openhuman/pull/6928) | Merged 2026-10-02; in the next release after 0.64.10 |
 | Docs: glibc floor of release tarballs, headless without an account, container keyring, OCI recipe | [#6927](https://github.com/tinyhumansai/openhuman/issues/6927), PR [#6929](https://github.com/tinyhumansai/openhuman/pull/6929) | Merged 2026-10-02 |
-| Headless keyring master key cannot be injected | [#6926](https://github.com/tinyhumansai/openhuman/issues/6926), PR [#6935](https://github.com/tinyhumansai/openhuman/pull/6935) | Open; env var or key file, with failure-path tests |
+| Headless keyring master key cannot be injected | [#6926](https://github.com/tinyhumansai/openhuman/issues/6926), PR [#6935](https://github.com/tinyhumansai/openhuman/pull/6935) | PR open; the deployment already generates the key in Vault and switches on the first release after 0.64.10 |
 | Tool-call ids exceed the 64-character cap OpenAI-compatible endpoints enforce | [#6933](https://github.com/tinyhumansai/openhuman/issues/6933) | Open; fix belongs in the tinyagents `CallId` |
 | Orchestrator sub-agent allowlist update never reaches the spawn tool | [#6934](https://github.com/tinyhumansai/openhuman/issues/6934), PR [#6939](https://github.com/tinyhumansai/openhuman/pull/6939) | PR open |
 | Custom cloud providers gated behind a session in headless mode | Comment on [#6601](https://github.com/tinyhumansai/openhuman/issues/6601) | Awaiting maintainers |
@@ -460,7 +463,7 @@ Licensing is not an obstacle in either direction: this repository is Apache-2.0,
 | `compartment.tf` | compartment, propagation delay |
 | `network.tf` | VCN, internet gateway, NAT gateway, service gateway, 2 route tables, closed security list, 2 subnets |
 | `security.tf` | 3 NSGs, 6 rules |
-| `vault.tf` | vault, AES key, 5 secrets, random token and password |
+| `vault.tf` | vault, AES key, 6 secrets, random token, password and keyring master key |
 | `database.tf` | Autonomous AI Database (Always Free, TLS, ACL) |
 | `dbtools.tf` | endpoint service lookup, private endpoint, connection, MCP server |
 | `identity.tf` | availability domains and identity domain lookups, user lookup, MCP users group, dynamic group, policy |

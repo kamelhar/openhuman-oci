@@ -75,6 +75,9 @@ The VM downloads `deploy/vm/*` from this repository's `main` at boot
   and its private endpoint. No wallet, no direct SQL from the core.
 - Inference runs in `local-openai` mode by default (no TinyHumans session).
   `byok-cloud` mode exists but requires `tinyhumans_api_key`.
+- Keyring: `keyring_backend = "auto"` means `encrypted_file` with the Vault-held
+  master key on any release newer than 0.64.10 (upstream PR #6935) and the file
+  keyring on 0.64.10. Do not hardcode either in `render_config.py`.
 - `terraform plan` must be clean after any change. Drift that comes from the
   provider (ADB cores, group schemas, reserved IP attachment) is silenced with
   `ignore_changes`, documented inline.

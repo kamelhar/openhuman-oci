@@ -2,7 +2,7 @@
 """Fetch secrets from OCI Vault with the instance principal and render the
 OpenHuman core environment and model settings.
 
-Runs from a systemd timer. Writes /opt/openhuman/core.env (bearer token,
+Runs from a systemd timer. Writes /opt/openhuman/core.env (bearer token, keyring,
 backend URL, optional TinyHumans key) and, once the core is healthy and the
 GenAI API key secret is populated, pushes the BYOK inference settings through
 the core's JSON-RPC so the route is completed the way the desktop app does it.
@@ -161,6 +161,51 @@ def ensure_agents(state, core_token):
         print(f"agent registry update failed: {e}")
 
 
+# First upstream release that can take the encrypted_file master key from the
+# environment (tinyhumansai/openhuman PR #6935, issue #6926): anything newer than
+# 0.64.10. On 0.64.10 a container has no keychain and no way to receive the key,
+# so the plaintext file keyring on the encrypted block volume is the only option.
+LAST_RELEASE_WITHOUT_MASTER_KEY = (0, 64, 10)
+
+
+def version_tuple(v):
+    parts = []
+    for piece in str(v).lstrip("v").split("."):
+        digits = "".join(ch for ch in piece if ch.isdigit())
+        parts.append(int(digits) if digits else 0)
+    while len(parts) < 3:
+        parts.append(0)
+    return tuple(parts[:3])
+
+
+def keyring_env(cfg, secrets):
+    """Return the OPENHUMAN_KEYRING_* lines for core.env.
+
+    KEYRING_BACKEND (from Terraform var.keyring_backend) is auto, file or
+    encrypted_file. auto = encrypted_file with the Vault-held master key when the
+    release supports it and the secret is configured, else file. A bootstrap.env
+    written before the master-key secret existed simply has no
+    SECRET_KEYRING_MASTER_KEY and stays on file until it is re-rendered.
+    """
+    mode = (cfg.get("KEYRING_BACKEND") or "auto").strip().lower()
+    secret_id = cfg.get("SECRET_KEYRING_MASTER_KEY", "").strip()
+    supported = version_tuple(cfg.get("OPENHUMAN_VERSION", "0")) > LAST_RELEASE_WITHOUT_MASTER_KEY
+    if mode == "auto":
+        mode = "encrypted_file" if (supported and secret_id) else "file"
+    if mode == "encrypted_file":
+        if not secret_id:
+            print("keyring: encrypted_file requested but SECRET_KEYRING_MASTER_KEY is missing; falling back to file")
+            return ["OPENHUMAN_KEYRING_BACKEND=file"]
+        if not supported:
+            print(f"keyring: release {cfg.get('OPENHUMAN_VERSION')} cannot take a master key; forcing encrypted_file anyway as requested")
+        key = secret_value(secrets, secret_id).strip()
+        if len(key) != 64 or any(ch not in "0123456789abcdefABCDEF" for ch in key):
+            print("keyring: master key secret is not 64 hex characters; falling back to file")
+            return ["OPENHUMAN_KEYRING_BACKEND=file"]
+        return ["OPENHUMAN_KEYRING_BACKEND=encrypted_file", f"OPENHUMAN_KEYRING_MASTER_KEY={key}"]
+    return ["OPENHUMAN_KEYRING_BACKEND=file"]
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--no-restart", action="store_true")
@@ -176,15 +221,13 @@ def main():
     core_token = secret_value(secrets, cfg["SECRET_CORE_TOKEN"])
     th_key = secret_value(secrets, cfg["SECRET_TINYHUMANS_KEY"])
     genai_key = secret_value(secrets, cfg["SECRET_GENAI_API_KEY"])
+    keyring_lines = keyring_env(cfg, secrets)
 
     lines = [
         f"OPENHUMAN_CORE_TOKEN={core_token}",
         f"BACKEND_URL={cfg['TINYHUMANS_BACKEND_URL']}",
         "OPENHUMAN_APP_ENV=production",
-        # Headless: no OS keychain, and upstream has no way to inject the
-        # encrypted_file master key, so secrets live in the workspace file on
-        # the (encrypted-at-rest) block volume.
-        "OPENHUMAN_KEYRING_BACKEND=file",
+        *keyring_lines,
         # local-openai mode: the core treats OCI GenAI's OpenAI-compatible endpoint
         # as a caller-owned runtime, which needs no TinyHumans session.
         f"LOCAL_OPENAI_URL={cfg['GENAI_INFERENCE_URL']}",

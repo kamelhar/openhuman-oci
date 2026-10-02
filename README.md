@@ -130,7 +130,7 @@ Vault. The full run book, including the smoke test, is in
 Short version; details and evidence in [`docs/PILOT.md`](docs/PILOT.md).
 
 - The upstream aarch64 binary needs glibc 2.39, so the runtime image is Ubuntu 24.04, not Debian.
-- A headless core has no OS keychain and upstream cannot inject the encrypted-file master key; the pilot runs the file keyring on the encrypted block volume.
+- A headless core has no OS keychain, and release 0.64.10 cannot take the encrypted-file master key from the environment, so on it the pilot runs the file keyring on the encrypted block volume. The fix is upstream PR #6935; Terraform already keeps a master key in Vault and the renderer switches to the encrypted keyring on the first newer release.
 - Custom cloud providers are gated behind a TinyHumans session; caller-owned runtimes are not. OCI GenAI runs as the `local-openai` runtime.
 - OCI load balancers cannot filter paths in ALLOW rules; the allowlist is a path route set with an empty default backend.
 - A Terraform-made OAuth client gets a valid token for the MCP server, yet IAM cannot authorize it as a principal. The invoke service log is the only place that names the missing permission.

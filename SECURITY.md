@@ -23,15 +23,18 @@ problems in OCI services go to Oracle support.
 ## Secrets
 
 All secrets live in OCI Vault: core bearer token, database ADMIN password,
-Generative AI API key, the MCP user token, and an optional TinyHumans key. The
+Generative AI API key, the MCP user token, the keyring master key, and an
+optional TinyHumans key. The
 VM reads them with its instance principal; nothing is baked into cloud-init or
 images. Terraform state holds the generated values, so keep state private.
 
-Inside the core, the headless build cannot reach an OS keychain and upstream
-provides no way to inject the encrypted-file master key, so the pilot runs the
+Inside the core, the headless build cannot reach an OS keychain. Release 0.64.10
+has no way to receive the encrypted-file master key, so on it the pilot runs the
 plaintext file keyring on the block volume (encrypted at rest by OCI, `0600`,
-private subnet). Treat the VM as a secret boundary. Tracking the upstream fix is
-item one in `docs/UPSTREAM.md`.
+private subnet) and the VM is the secret boundary. Upstream PR #6935 adds
+`OPENHUMAN_KEYRING_MASTER_KEY`; Terraform already generates that key into Vault
+and `render_config.py` switches to the `encrypted_file` keyring on any newer
+release (`keyring_backend = "auto"`), re-pushing the provider keys afterwards.
 
 ## Rotation
 

@@ -23,6 +23,11 @@ resource "random_id" "core_token" {
   byte_length = 32
 }
 
+# Master key for the core's encrypted_file keyring (64 hex chars, upstream PR #6935).
+resource "random_id" "keyring_master_key" {
+  byte_length = 32
+}
+
 resource "random_password" "adb_admin" {
   length           = 24
   special          = true
@@ -45,6 +50,19 @@ resource "oci_vault_secret" "core_token" {
   secret_content {
     content_type = "BASE64"
     content      = base64encode(random_id.core_token.hex)
+  }
+}
+
+resource "oci_vault_secret" "keyring_master_key" {
+  compartment_id = local.compartment_id
+  vault_id       = oci_kms_vault.this.id
+  key_id         = oci_kms_key.this.id
+  secret_name    = "${var.name_prefix}-keyring-master-key"
+  description    = "Master key for the OpenHuman core encrypted_file keyring (OPENHUMAN_KEYRING_MASTER_KEY)"
+
+  secret_content {
+    content_type = "BASE64"
+    content      = base64encode(random_id.keyring_master_key.hex)
   }
 }
 
