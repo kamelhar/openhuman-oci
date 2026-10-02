@@ -42,3 +42,6 @@ media/demo-research.mp4
 media/title-research.mp4
 media/outro-research.mp4
 media/.demo-research-elapsed
+
+# diagram render cache
+media/diagrams/.cache/

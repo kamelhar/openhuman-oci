@@ -7,7 +7,8 @@ for f in title.mp4 demo.mp4 browser-card.mp4 outro.mp4; do [ -f "$f" ] || { echo
 # trim the terminal capture to what the demo actually took (+ typing and a tail), using the
 # elapsed seconds the demo wrote; fall back to the full capture.
 LEAD="${DEMO_LEAD_TRIM:-3}"   # seconds of typing/blank at the start to drop
-if [ -f .demo-elapsed ]; then
+# Trim only on a fresh capture (DEMO_TRIM=1): the committed demo.mp4 is already trimmed.
+if [ "${DEMO_TRIM:-0}" = "1" ] && [ -f .demo-elapsed ]; then
   DUR=$(( $(cat .demo-elapsed) + 14 ))
   ffmpeg -y -loglevel error -ss "$LEAD" -i demo.mp4 -t "$DUR" -c:v libx264 -preset veryfast -crf 20 -an _demo-trim.mp4 && mv _demo-trim.mp4 demo.mp4
 fi

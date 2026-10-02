@@ -1,0 +1,81 @@
+# Figure 1. OpenHuman on OCI, as built. Render: media/diagrams/render.sh architecture
+vars: {
+  d2-config: {
+    layout-engine: elk
+    theme-id: 0
+  }
+}
+direction: right
+
+classes: {
+  oci: { shape: image; width: 96; height: 96; style.font-size: 22; style.font-color: "#312D2A" }
+  svc: { style: { fill: "#FFFFFF"; stroke: "#2C5967"; stroke-width: 2; border-radius: 8; font-size: 22; font-color: "#312D2A" } }
+  region: { style: { fill: "#F5F4F2"; stroke: "#9E9892"; stroke-width: 2; stroke-dash: 6; border-radius: 10; font-size: 26; font-color: "#312D2A"; bold: true } }
+  net: { style: { fill: "#FCFBFA"; stroke: "#AE562C"; stroke-width: 2; border-radius: 10; font-size: 24; font-color: "#312D2A"; bold: true } }
+  subnet: { style: { fill: "#FFFFFF"; stroke: "#2C5967"; stroke-width: 2; stroke-dash: 3; border-radius: 8; font-size: 22; font-color: "#2C5967"; bold: true } }
+  vm: { style: { fill: "#EEF3F4"; stroke: "#2C5967"; stroke-width: 2; border-radius: 10; font-size: 22; font-color: "#312D2A"; bold: true } }
+  tools: { style: { fill: "#FFFFFF"; stroke: "#9E9892"; stroke-width: 2; stroke-dash: 3; border-radius: 8; font-size: 20; font-color: "#312D2A" } }
+  flow: { style: { stroke: "#312D2A"; stroke-width: 3; font-size: 19; font-color: "#312D2A" } }
+  ctl: { style: { stroke: "#9E9892"; stroke-width: 3; stroke-dash: 5; font-size: 19; font-color: "#6B655F" } }
+}
+
+laptop: "Operator laptop\nOpenHuman app or any client\nbearer core token" {
+  class: svc
+  icon: ../logos/openhumanlogo-black.svg
+}
+
+region: "OCI region · one compartment · everything Always Free except Generative AI tokens" {
+  class: region
+
+  iam: "IAM\n1 policy · dynamic group\ndomain group + MCP_Operator" { class: oci; icon: ../logos/oci/iam.png }
+  bastion: "Bastion\nadmin only" { class: oci; icon: ../logos/oci/bastion.png }
+
+  vcn: "VCN 10.80.0.0/16" {
+    class: net
+    igw: "Internet\ngateway" { class: oci; icon: ../logos/oci/internet-gateway.png }
+    public: "Public subnet 10.80.0.0/24" {
+      class: subnet
+      lb: "Flexible load balancer\n10 Mbps · reserved IP · own CA\nforwards /rpc /health /events" { class: oci; icon: ../logos/oci/flexible-load-balancer.png }
+    }
+    private: "Private subnet 10.80.1.0/24 · no public IPs" {
+      class: subnet
+      vm: "Ampere A1 Flex VM · 3 OCPU / 18 GB · Ubuntu 24.04 · Docker Compose" {
+        class: vm
+        icon: ../logos/oci/flex-vm.png
+        core: "openhuman-core\nupstream aarch64 release\nJSON-RPC :7788" { class: svc; icon: ../logos/openhumanlogo-black.svg }
+        tools: "compose network only" {
+          class: tools
+          searx: "SearXNG\nweb search" { class: svc; icon: ../logos/searxng.svg }
+          pw: "Playwright MCP\nheadless Chromium" { class: svc; icon: ../logos/playwright.svg }
+          ollama: "Ollama\nbge-m3 embeddings" { class: svc; icon: ../logos/ollama.png }
+        }
+        vol: "Block volume 50 GB\nmemory · sessions · models" { class: oci; icon: ../logos/oci/block-storage.png }
+        core -> tools: "search · browse · embed" { class: flow }
+      }
+      pe: "Database Tools\nprivate endpoint" { class: svc }
+    }
+    nat: "NAT\ngateway" { class: oci; icon: ../logos/oci/nat-gateway.png }
+    sgw: "Service gateway\nOracle Services Network" { class: oci; icon: ../logos/oci/service-gateway.png }
+  }
+
+  vault: "OCI Vault\ncore token · GenAI key\nADB password · MCP user token" { class: oci; icon: ../logos/oci/vault.png }
+  mcp: "Database Tools MCP Server\nmanaged · resource principal\ncallers need MCP_Operator" { class: svc; icon: ../logos/mcp-mark.svg }
+  adb: "Autonomous AI Database 26ai\nAlways Free · TLS, no wallet\nACL: this VCN + operator IP" { class: oci; icon: ../logos/oci/oracle-autonomous-database.png }
+  logging: "Logging\nMCP invoke log" { class: oci; icon: ../logos/oci/logging.png }
+}
+
+genai: "OCI Generative AI\nus-chicago-1 · OpenAI-compatible\nopenai.gpt-4.1 · API key" { class: oci; icon: ../logos/oci/oci-generative-ai.png }
+web: "Public web\nsearch · fetch · browse" { class: oci; icon: ../logos/oci/internet.png }
+
+laptop -> region.vcn.public.lb: "HTTPS 443\noperator CIDRs only" { class: flow }
+region.vcn.public.lb -> region.vcn.private.vm.core: "7788 · from the LB only" { class: flow }
+region.vcn.private.vm.core -> region.vcn.nat { class: flow }
+region.vcn.nat -> genai: "chat completions" { class: flow }
+region.vcn.nat -> web { class: flow }
+region.vcn.private.vm.core -> region.mcp: "streamable HTTP MCP\nuser token" { class: flow }
+region.mcp -> region.vcn.private.pe: "dbtools_execute_sql" { class: flow }
+region.vcn.private.pe -> region.vcn.sgw { class: flow }
+region.vcn.sgw -> region.adb: "TLS 1521" { class: flow }
+region.vcn.private.vm -> region.vault: "instance principal\nreads secrets" { class: ctl }
+region.bastion -> region.vcn.private.vm: "SSH 22" { class: ctl }
+region.mcp -> region.logging { class: ctl }

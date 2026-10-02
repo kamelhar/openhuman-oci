@@ -1,0 +1,45 @@
+# Figure 4. The clinical research session, as recorded.
+vars: {
+  d2-config: {
+    layout-engine: elk
+    theme-id: 0
+  }
+}
+direction: right
+classes: {
+  step: { style: { fill: "#FFFFFF"; stroke: "#2C5967"; stroke-width: 2; border-radius: 10; font-size: 22; font-color: "#312D2A" } }
+  lane: { style: { fill: "#F5F4F2"; stroke: "#9E9892"; stroke-width: 2; stroke-dash: 6; border-radius: 12; font-size: 24; font-color: "#312D2A"; bold: true } }
+  flow: { style: { stroke: "#312D2A"; stroke-width: 3; font-size: 19; font-color: "#312D2A" } }
+}
+
+s1: "1 · the data" {
+  class: lane
+  adb: "Autonomous AI Database\nCLINICAL_TRIALS · 4,300 studies\nSQL over TLS inside the VCN\n319 Phase 3 · top sponsors" { class: step; icon: ../logos/oci/oracle-autonomous-database.png }
+}
+s2: "2 · three researchers in parallel · 13 s" {
+  class: lane
+  r1: "researcher · Eli Lilly\nSearXNG → fetch ≤ 12 kB\n3 verified bullets + URLs" { class: step; icon: ../logos/openhumanlogo-black.svg }
+  r2: "researcher · Roche\nSearXNG → fetch ≤ 12 kB\n3 verified bullets + URLs" { class: step; icon: ../logos/openhumanlogo-black.svg }
+  r3: "researcher · Otsuka\nSearXNG → fetch ≤ 12 kB\n3 verified bullets + URLs" { class: step; icon: ../logos/openhumanlogo-black.svg }
+}
+s3: "3 · synthesis, no tools" {
+  class: lane
+  syn: "gpt-4.1 @ 0.2\nOCI Generative AI\nregistry history vs\nlive pipeline" { class: step; icon: ../logos/oci/oci-generative-ai.png }
+}
+s4: "4 · deep dive · 16–21 s" {
+  class: lane
+  dd: "donanemab brief\nfrom fda.gov\nTRAILBLAZER-ALZ 2\nARIA-E ~24 % · open questions" { class: step; icon: ../logos/oci/internet.png }
+}
+s5: "5 · memory" {
+  class: lane
+  mem: "memory tree\nbge-m3 on Ollama\nMEMORY_SAVED\nread back next turn" { class: step; icon: ../logos/ollama.png }
+}
+
+s1.adb -> s2.r1: "top 3 sponsors,\nderived not scripted" { class: flow }
+s1.adb -> s2.r2 { class: flow }
+s1.adb -> s2.r3 { class: flow }
+s2.r1 -> s3.syn { class: flow }
+s2.r2 -> s3.syn { class: flow }
+s2.r3 -> s3.syn { class: flow }
+s3.syn -> s4.dd: "approved drug" { class: flow }
+s4.dd -> s5.mem: "brief + 2 sources" { class: flow }

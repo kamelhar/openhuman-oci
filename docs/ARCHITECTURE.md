@@ -67,6 +67,10 @@ results, is in [`PILOT.md`](PILOT.md).
 
 ## 2. Component mapping
 
+*As built in the pilot (Shape A); the design alternatives follow.*
+
+![As built](../media/diagrams/architecture.png)
+
 ```
                  ┌──────────────────────── OCI tenancy ─────────────────────────┐
                  │                                                               │

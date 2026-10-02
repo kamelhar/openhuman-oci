@@ -22,48 +22,9 @@ The work also produced nine upstream findings, five of them filed as issues and 
 
 ---
 
-```
-                                      ┌─────────────────────────── OCI tenancy · one compartment ───────────────────────────┐
-                                      │                                                                                     │
-  Your laptop                         │  public subnet                      private subnet                                  │
- ┌──────────────────────┐             │ ┌─────────────────────────┐        ┌──────────────────────────────────────────────┐  │
- │ OpenHuman desktop    │  HTTPS 443  │ │ Flexible LB 10 Mbps     │  7788  │ Ampere A1 VM · 3 OCPU / 18 GB · Ubuntu 24.04 │  │
- │ app or any client    ├─────────────┼►│ reserved IP, own CA     │───────►│  ┌──────────────┐  ┌────────────────┐        │  │
- │ Authorization:       │  NSG: your  │ │ path route set:         │  NSG:  │  │ openhuman-core│  │ Ollama bge-m3   │        │  │
- │  Bearer <core token> │  CIDR only  │ │  /rpc /health /events   │  LB    │  │ (upstream     │  │ embeddings      │        │  │
- └──────────────────────┘             │ │  else → empty backend   │  only  │  │  aarch64 bin) │  └────────────────┘        │  │
-                                      │ └─────────────────────────┘        │  │               │  ┌────────────────┐        │  │
-                                      │                                    │  │               │──│ SearXNG         │        │  │
-                                      │                                    │  │               │  │ web search      │        │  │
-                                      │                                    │  │               │  └────────────────┘        │  │
-                                      │                                    │  │               │  ┌────────────────┐        │  │
-                                      │                                    │  │               │──│ Playwright MCP  │        │  │
-                                      │                                    │  └──────┬────────┘  │ headless Chrome │        │  │
-                                      │                                    │         │ instance  └────────────────┘        │  │
-                                      │                                    │         │ principal   50 GB workspace volume   │  │
-                                      │                                    └─────────┼────────────────────────────────────┘  │
-                                      │                                              ▼                                       │
-                                      │   ┌──────────────────────────┐   ┌──────────────────────────────┐                   │
-                                      │   │ OCI Vault (software key) │   │ Database Tools MCP Server    │◄── Bearer user    │
-                                      │   │ core token · GenAI key   │   │ managed · resource principal │    token (from    │
-                                      │   │ DB password · MCP token  │   │ app roles: MCP_Operator      │    Vault) ────────┼── core
-                                      │   └──────────────────────────┘   └──────────────┬───────────────┘                   │
-                                      │                                                 │ dbtools_execute_sql               │
-                                      │   NAT gateway ──► OCI Generative AI (us-chicago-1)   ┌──────────▼───────────────┐    │
-                                      │   (egress allowlist)   OpenAI-compatible endpoint     │ Database Tools private   │    │
-                                      │                        wired as "local-openai"        │ endpoint + connection    │    │
-                                      │                        authorized as generativeaiapikey└──────────┬───────────────┘    │
-                                      │                                                                 │ service gateway    │
-                                      │   Bastion (admin, 3 h sessions)              ┌──────────────────▼───────────────┐    │
-                                      │   Log group: MCP invoke service log          │ Autonomous AI Database 26ai      │    │
-                                      │                                              │ Always Free · TLS, no wallet     │    │
-                                      │                                              │ ACL = this VCN + operator IP     │    │
-                                      │                                              │ CLINICAL_TRIALS (4,300 rows)     │    │
-                                      │                                              └──────────────────────────────────┘    │
-                                      └─────────────────────────────────────────────────────────────────────────────────────┘
-```
+![Figure 1. The deployed pilot.](../media/diagrams/architecture.png)
 
-*Figure 1. The deployed pilot. The laptop reaches only the load balancer; the core has no public IP and pulls every secret from Vault with its instance principal; agents reach the database only through the managed MCP server, whose own connection goes through a private endpoint and the service gateway.*
+*Figure 1. The deployed pilot, drawn with Oracle's architecture-diagram icon set. The laptop reaches only the load balancer; the core has no public IP and pulls every secret from Vault with its instance principal; agents reach the database only through the managed MCP server, whose own connection goes through a private endpoint and the service gateway. A plain-text rendering for terminals lives in `media/architecture.txt`.*
 
 ---
 
@@ -131,47 +92,21 @@ Three flows define the system. Each is drawn as the sequence of principals and c
 
 **Flow A, a chat turn from the laptop.**
 
-```
-laptop ──HTTPS──► LB:443 ─ NSG: source in allowed_client_cidrs?
-                           ─ path route set: /rpc /health /events → "core"; anything else → "blackhole"
-                  LB ──HTTP──► VM:7788 ─ NSG: source is the LB's NSG?
-                  core ─ Authorization: Bearer == OPENHUMAN_CORE_TOKEN? (401 otherwise)
-                  core ─ role pinned to local-openai:openai.gpt-4.1@0.2
-                  core ──HTTPS via NAT──► inference.generativeai.<region>.oci.oraclecloud.com
-                                          /openai/v1/chat/completions
-                                          Authorization: Bearer <GenAI API key>
-                       OCI IAM: principal type 'generativeaiapikey' allowed in this compartment?
-                  core ◄── completion ──► tools (search, fetch, browser, memory) ──► next call …
-                  laptop ◄── JSON-RPC result
-```
+![Figure 2a. Flow A: a chat turn. The load balancer admits the request by source CIDR and path, the core checks its bearer token, and the model call goes to OCI Generative AI under the API key's own IAM policy. Tool calls arrive as text and are parsed by the harness.](../media/diagrams/flow-chat.png)
+
+*Figure 2a. Flow A: a chat turn. The load balancer admits the request by source CIDR and path, the core checks its bearer token, and the model call goes to OCI Generative AI under the API key's own IAM policy. Tool calls arrive as text and are parsed by the harness.*
 
 **Flow B, the VM reconciling its configuration.**
 
-```
-systemd timer (every 2 min) ──► render_config.py
-  ── InstancePrincipalsSecurityTokenSigner ──► Vault: get_secret_bundle × 5
-       OCI IAM: dynamic-group openhuman-vm may read secret-bundles in compartment?
-  ── core.env (bearer token, backend URL, keyring backend, SearXNG, LOCAL_OPENAI_URL)
-     ──► restart the core only if the file changed
-  ── JSON-RPC to 127.0.0.1:7788 with the bearer:
-       config_update_local_ai_settings  (Ollama runtime + GenAI key as the local-openai bearer)
-       config_update_model_settings     (roles → local-openai:<model>@<temp>; embeddings → ollama:bge-m3)
-       mcp_clients_config_set           (browser server always; oracle-db once the user token exists)
-       agent_registry_*                 (researcher sub-agent, orchestrator allowlist)
-```
+![Figure 2b. Flow B: the VM reconciles itself every two minutes. Secrets come from Vault through the instance principal; settings and MCP registrations are pushed through the core's own RPC so that order of operations never matters.](../media/diagrams/flow-reconcile.png)
+
+*Figure 2b. Flow B: the VM reconciles itself every two minutes. Secrets come from Vault through the instance principal; settings and MCP registrations are pushed through the core's own RPC so that order of operations never matters.*
 
 **Flow C, an agent reaching the database.**
 
-```
-core ──streamable HTTP MCP──► mcp.dbtools.<region>.oci.oraclecloud.com/.../actions/invoke
-       Authorization: Bearer <identity-domain user token>
-     Database Tools service: token valid? caller holds MCP_Operator on the server's app?
-     OCI IAM: caller may use database-tools-mcp-servers-invocation in compartment?
-     MCP server (resource principal) may use database-tools-connections, principal.id = <server>?
-     connection (resource principal) may read secret-bundles, principal.id = <connection>?
-     connection ──TLS──► private endpoint VNIC (private subnet) ──► service gateway ──► ADB endpoint
-     ADB access list: source VCN OCID present? → dbtools_execute_sql → rows ──► core
-```
+![Figure 2c. Flow C: an agent reaches Oracle Database. Four principals each hold one permission; the agent holds none of the database's.](../media/diagrams/flow-mcp.png)
+
+*Figure 2c. Flow C: an agent reaches Oracle Database. Four principals each hold one permission; the agent holds none of the database's.*
 
 ---
 
@@ -347,6 +282,10 @@ A log group with the Database Tools MCP server's `invoke` service log is part of
 
 ## 9. Identity and secrets model
 
+![Figure 3. Every principal and what it may use.](../media/diagrams/identity.png)
+
+*Figure 3. Every principal in the system and the one thing each may use. Green edges are granted by Terraform-managed policy; the dashed red edge is the client-credentials path that IAM cannot authorise today.*
+
 *Table 4. Every principal in the system and what it may do.*
 
 | Principal | Kind | Authorised to | Not authorised to |
@@ -394,6 +333,10 @@ A research analyst's question: where does Alzheimer's disease drug development s
 | Top industry sponsors, Phase 3 | Eli Lilly 20 (24,485 enrolled), Otsuka 14 (4,796), Roche 14 (90,268), Pfizer 14 (7,062), J&J 13 (7,493) |
 
 ### 10.2 The run
+
+![Figure 4. The recorded research session.](../media/diagrams/research.png)
+
+*Figure 4. The recorded session: the registry data in the database, three researcher turns in parallel, a tool-free synthesis, a regulator-only deep dive, and the brief read back from memory.*
 
 Scene one queried the database over TLS from inside the VCN and derived the three sponsors to research from the result rather than from a script. Scene two started three researcher turns in parallel, each instructed to search, read two authoritative pages with a 12,000-byte cap, and return three verified bullets with URLs; all three returned in 13 seconds. Scene three asked the model, with no tools, to synthesise the notes against the table it had just seen.
 
@@ -530,7 +473,11 @@ Licensing is not an obstacle in either direction: this repository is Apache-2.0,
 
 `openhuman.config_update_local_ai_settings`, `openhuman.config_update_model_settings`, `openhuman.mcp_clients_config_set`, `openhuman.mcp_clients_installed_list`, `openhuman.mcp_clients_list_tools`, `openhuman.agent_registry_create_custom`, `openhuman.agent_registry_update`, `openhuman.agent_registry_get`, `openhuman.inference_agent_chat`, `openhuman.inference_agent_chat_simple`, `openhuman.tools_web_search`, `openhuman.memory_recall_memories`, `openhuman.memory_query_namespace`, `openhuman.inference_diagnostics`, `openhuman.config_get_search_settings`. The schema is served unauthenticated at `/schema`.
 
-## Appendix C. Glossary
+## Appendix C. Figures and marks
+
+Figures 1 and 4 are drawn by `media/diagrams/figures.py` in the style of the OCI Architecture Diagram Toolkit, with Oracle's published service icons. Figures 2 and 3 are D2 sources in `media/diagrams/`, rendered by `media/diagrams/render.sh`. Product logos (OpenHuman, Model Context Protocol, Ollama, SearXNG, Playwright, Ubuntu, GitHub) are the owners' published artwork, used only to identify the products; sources and terms are listed in `media/logos/SOURCES.md`. All names and logos are trademarks of their respective owners.
+
+## Appendix D. Glossary
 
 **MCP**: Model Context Protocol, the open protocol by which agents discover and call tools on servers. **Database Tools MCP Server**: OCI's managed, serverless MCP server for Oracle Database. **Resource principal**: an OCI identity for a service-managed resource. **Instance principal**: an OCI identity for a compute instance. **Identity domain**: OCI IAM's user, group and application directory. **Personal access token**: a user-bound OAuth token generated in the identity domain for an application. **Always Free**: OCI resources free of charge for the life of the tenancy within fixed allowances. **Prompt-guided tool dialect**: tool calling by textual markup parsed from the model's output rather than native function calling.
 

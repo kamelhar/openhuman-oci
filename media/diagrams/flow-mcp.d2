@@ -1,0 +1,25 @@
+# Figure 2c. Flow C: an agent reaches Oracle Database through the managed MCP server.
+vars: {
+  d2-config: {
+    theme-id: 0
+  }
+}
+shape: sequence_diagram
+style.font-size: 26
+core: openhuman-core { shape: image; icon: ../logos/openhumanlogo-black.svg; width: 72; height: 72 ; style.font-size: 24 }
+mcp: Database Tools MCP Server { shape: image; icon: ../logos/mcp-mark.svg; width: 72; height: 72 ; style.font-size: 24 }
+iam: OCI IAM + identity domain { shape: image; icon: ../logos/oci/iam.png; width: 72; height: 72 ; style.font-size: 24 }
+conn: Database Tools connection { shape: image; icon: ../logos/oci/certificates.png; width: 72; height: 72 ; style.font-size: 24 }
+vault: OCI Vault { shape: image; icon: ../logos/oci/vault.png; width: 72; height: 72 ; style.font-size: 24 }
+adb: Autonomous AI Database { shape: image; icon: ../logos/oci/oracle-autonomous-database.png; width: 72; height: 72 ; style.font-size: 24 }
+
+core -> mcp: "streamable HTTP MCP: tools/call dbtools_execute_sql\nAuthorization: Bearer <identity-domain user token>" { style.font-size: 22 }
+mcp -> iam: "token valid? caller holds MCP_Operator on the server's app?\ncaller may use database-tools-mcp-servers-invocation?" { style.font-size: 22 }
+iam -> mcp: "allow (or -32007 with the permission named in the invoke log)" { style.font-size: 22 }
+mcp -> conn: "resource principal: use database-tools-connections\nwhere request.principal.id = <mcp server>" { style.font-size: 22 }
+conn -> vault: "resource principal: read the one password secret\nwhere request.principal.id = <connection>" { style.font-size: 22 }
+vault -> conn: "ADMIN password" { style.font-size: 22 }
+conn -> adb: "TLS via private endpoint VNIC → service gateway\nADB access list: VCN OCID present?" { style.font-size: 22 }
+adb -> conn: "rows" { style.font-size: 22 }
+conn -> mcp: "result set" { style.font-size: 22 }
+mcp -> core: "tool result (rows as JSON)" { style.font-size: 22 }

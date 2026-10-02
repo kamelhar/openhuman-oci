@@ -76,39 +76,13 @@ pipeline, a deep dive on an approved program from FDA pages, and the brief
 read back from memory. Driven by `deploy/scripts/demo-research.sh`, recorded
 with `media/demo-research.tape`, assembled by `media/assemble-research.sh`.
 
+![The recorded research session](media/diagrams/research.png)
+
 ## What gets built
 
-```mermaid
-flowchart LR
-  subgraph laptop[Your laptop]
-    app[OpenHuman desktop app<br/>external core mode]
-  end
-  subgraph oci[OCI tenancy, one compartment]
-    lb[Flexible LB 10 Mbps<br/>TLS, path route set<br/>/rpc /health /events]
-    subgraph vm[Ampere A1 VM, private subnet]
-      core[openhuman-core<br/>container]
-      ollama[Ollama bge-m3<br/>embeddings]
-      searx[SearXNG<br/>web search]
-      pw[Playwright MCP<br/>headless Chromium]
-    end
-    vault[(Vault<br/>core token, GenAI key,<br/>DB password, MCP token)]
-    mcp[Database Tools<br/>MCP Server]
-    pe[Database Tools<br/>private endpoint]
-    adb[(Autonomous AI DB 26ai<br/>Always Free)]
-    nat[NAT gateway]
-    sgw[Service gateway]
-    bastion[Bastion<br/>admin only]
-  end
-  genai[OCI Generative AI<br/>OpenAI-compatible endpoint]
-  app -- HTTPS + bearer --> lb --> core
-  core --> ollama
-  core --> searx
-  core -- MCP --> pw
-  core -. instance principal .-> vault
-  core -- "local-openai runtime<br/>GenAI API key" --> nat --> genai
-  core -- "streamable HTTP MCP<br/>user token" --> mcp --> pe --> sgw --> adb
-  bastion -.-> core
-```
+![OpenHuman on OCI, as built](media/diagrams/architecture.png)
+
+*The deployed pilot, drawn with Oracle's architecture icon set. Plain-text version: [`media/architecture.txt`](media/architecture.txt); sources in [`media/diagrams/`](media/diagrams).*
 
 | Layer | Resources | Cost |
 | --- | --- | --- |

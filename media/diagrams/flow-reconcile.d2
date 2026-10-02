@@ -1,0 +1,26 @@
+# Figure 2b. Flow B: the VM reconciles its own configuration every two minutes.
+vars: {
+  d2-config: {
+    theme-id: 0
+  }
+}
+shape: sequence_diagram
+style.font-size: 26
+timer: systemd timer { shape: image; icon: ../logos/ubuntu.png; width: 72; height: 72 ; style.font-size: 24 }
+render: render_config.py { shape: image; icon: ../logos/oci/flex-vm.png; width: 72; height: 72 ; style.font-size: 24 }
+iam: OCI IAM { shape: image; icon: ../logos/oci/iam.png; width: 72; height: 72 ; style.font-size: 24 }
+vault: OCI Vault { shape: image; icon: ../logos/oci/vault.png; width: 72; height: 72 ; style.font-size: 24 }
+core: openhuman-core { shape: image; icon: ../logos/openhumanlogo-black.svg; width: 72; height: 72 ; style.font-size: 24 }
+
+timer -> render: "every 2 min" { style.font-size: 22 }
+render -> vault: "get_secret_bundle × 5\nInstancePrincipalsSecurityTokenSigner" { style.font-size: 22 }
+vault -> iam: "dynamic group openhuman-vm\nmay read secret-bundles?" { style.font-size: 22 }
+iam -> vault: "allow" { style.font-size: 22 }
+vault -> render: "core token · GenAI key · ADB password\nMCP user token · TinyHumans key (optional)" { style.font-size: 22 }
+render -> render: "write core.env (token, backend URL, keyring=file,\nSearXNG, LOCAL_OPENAI_URL); hash of pushed settings" { style.font-size: 22 }
+render -> core: "restart only if core.env changed" { style.stroke-dash: 3; style.font-size: 22 }
+render -> core: "config_update_local_ai_settings\n(Ollama runtime, GenAI key as local-openai bearer)" { style.font-size: 22 }
+render -> core: "config_update_model_settings\n(roles → local-openai:<model>@<temp>, embeddings → ollama:bge-m3)" { style.font-size: 22 }
+render -> core: "mcp_clients_config_set\n(browser always; oracle-db once the user token exists)" { style.font-size: 22 }
+render -> core: "agent_registry_* (researcher sub-agent, orchestrator allowlist)" { style.font-size: 22 }
+core -> render: "ok (idempotent)" { style.font-size: 22 }

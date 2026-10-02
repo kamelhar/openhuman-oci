@@ -1,0 +1,51 @@
+# Figure 3. Every principal and what it may do.
+vars: {
+  d2-config: {
+    layout-engine: elk
+    theme-id: 0
+  }
+}
+direction: right
+classes: {
+  p: { style: { fill: "#FFFFFF"; stroke: "#2C5967"; border-radius: 6; font-size: 24; font-color: "#312D2A" } }
+  r: { style: { fill: "#F5F4F2"; stroke: "#9E9892"; border-radius: 6; font-size: 24; font-color: "#312D2A" } }
+  allow: { style: { stroke: "#759C6C"; stroke-width: 3; font-size: 20; font-color: "#3F6B39" } }
+  deny: { style: { stroke: "#A36472"; stroke-width: 3; stroke-dash: 4; font-size: 20; font-color: "#A36472" } }
+  col: { style: { fill: transparent; stroke: transparent; font-size: 28; font-color: "#312D2A"; bold: true } }
+}
+
+principals: "Principals" {
+  class: col
+  operator: "Operator\nidentity-domain user\nmember of openhuman-mcp-users\nholds MCP_Operator" { class: p; icon: ../logos/oci/user.png }
+  client: "Client\nholder of the core bearer token\nsource in allowed_client_cidrs" { class: p; icon: ../logos/openhumanlogo-black.svg }
+  vm: "VM\ndynamic group openhuman-vm\n(instance principal)" { class: p; icon: ../logos/oci/flex-vm.png }
+  core: "Core at runtime\nbearer of the GenAI key\nand the MCP user token" { class: p; icon: ../logos/openhumanlogo-black.svg }
+  gkey: "GenAI API key\nprincipal type generativeaiapikey" { class: p; icon: ../logos/oci/key-vault.png }
+  mcp: "MCP server\nresource principal" { class: p; icon: ../logos/mcp-mark.svg }
+  conn: "Database Tools connection\nresource principal" { class: p; icon: ../logos/oci/certificates.png }
+  oauth: "Experimental OAuth client\nclient-credentials app (off by default)" { class: p; icon: ../logos/oci/oracle-identity-cloud-service.png }
+}
+
+resources: "Resources" {
+  class: col
+  lb: "Load balancer\n/rpc /health /events" { class: r; icon: ../logos/oci/flexible-load-balancer.png }
+  secrets: "Vault secret bundles" { class: r; icon: ../logos/oci/vault.png }
+  genai: "OCI Generative AI\ngenerative-ai-family in the compartment" { class: r; icon: ../logos/oci/oci-generative-ai.png }
+  mcpinv: "MCP server invocation\ndatabase-tools-mcp-servers-invocation" { class: r; icon: ../logos/mcp-mark.svg }
+  dbconn: "Database Tools connection\nthe one connection" { class: r; icon: ../logos/oci/certificates.png }
+  pw: "ADB admin password\nthe one secret" { class: r; icon: ../logos/oci/key-vault.png }
+  adb: "Autonomous AI Database\nACL: VCN + operator IP" { class: r; icon: ../logos/oci/oracle-autonomous-database.png }
+  tf: "Terraform (OCI API)" { class: r; icon: ../logos/terraform.svg }
+}
+
+principals.operator -> resources.mcpinv: "MCP_Operator + policy on the group" { class: allow }
+principals.operator -> resources.tf: "runs apply" { class: allow }
+principals.client -> resources.lb: "bearer + CIDR" { class: allow }
+principals.vm -> resources.secrets: "read secret-bundles" { class: allow }
+principals.core -> resources.genai: "chat completions" { class: allow }
+principals.core -> resources.mcpinv: "as the operator (user token)" { class: allow }
+principals.gkey -> resources.genai: "use generative-ai-family" { class: allow }
+principals.mcp -> resources.dbconn: "use, where principal.id = server" { class: allow }
+principals.conn -> resources.pw: "read, where principal.id = connection" { class: allow }
+principals.conn -> resources.adb: "TLS via private endpoint" { class: allow }
+principals.oauth -> resources.mcpinv: "token accepted, IAM denies -32007" { class: deny }

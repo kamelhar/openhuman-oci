@@ -4,7 +4,8 @@ set -euo pipefail
 cd "$(dirname "$0")"
 for f in title-research.mp4 demo-research.mp4 outro-research.mp4; do [ -f "$f" ] || { echo "missing $f" >&2; exit 1; }; done
 LEAD="${DEMO_LEAD_TRIM:-3}"
-if [ -f .demo-research-elapsed ]; then
+# Trim only on a fresh capture (DEMO_TRIM=1): the committed demo-research.mp4 is already trimmed.
+if [ "${DEMO_TRIM:-0}" = "1" ] && [ -f .demo-research-elapsed ]; then
   DUR=$(( $(cat .demo-research-elapsed) + 14 ))
   ffmpeg -y -loglevel error -ss "$LEAD" -i demo-research.mp4 -t "$DUR" -c:v libx264 -preset veryfast -crf 20 -an _d.mp4 && mv _d.mp4 demo-research.mp4
 fi

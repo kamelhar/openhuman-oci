@@ -1,0 +1,29 @@
+# Figure 2a. Flow A: a chat turn from the laptop.
+vars: {
+  d2-config: {
+    theme-id: 0
+  }
+}
+shape: sequence_diagram
+style.font-size: 26
+laptop: Laptop { icon: ../logos/openhumanlogo-black.svg; shape: image; width: 72; height: 72 ; style.font-size: 24 }
+lb: Load balancer { icon: ../logos/oci/flexible-load-balancer.png; shape: image; width: 72; height: 72 ; style.font-size: 24 }
+core: openhuman-core { icon: ../logos/openhumanlogo-black.svg; shape: image; width: 72; height: 72 ; style.font-size: 24 }
+iam: OCI IAM { icon: ../logos/oci/iam.png; shape: image; width: 72; height: 72 ; style.font-size: 24 }
+genai: Generative AI { icon: ../logos/oci/oci-generative-ai.png; shape: image; width: 72; height: 72 ; style.font-size: 24 }
+tools: Tools { icon: ../logos/playwright.svg; shape: image; width: 72; height: 72 ; style.font-size: 24 }
+
+laptop -> lb: "POST /rpc  Authorization: Bearer <core token>\nNSG: source in allowed_client_cidrs" { style.font-size: 22 }
+lb -> lb: "path route set: /rpc /health /events → core\nanything else → empty backend set (502)" { style.font-size: 22 }
+lb -> core: "HTTP 7788  (NSG: from the LB only)" { style.font-size: 22 }
+core -> core: "token == OPENHUMAN_CORE_TOKEN? else 401\nrole pinned to local-openai:openai.gpt-4.1@0.2" { style.font-size: 22 }
+core -> genai: "chat/completions via NAT gateway\nAuthorization: Bearer <GenAI API key>" { style.font-size: 22 }
+genai -> iam: "principal type generativeaiapikey\nallowed in this compartment?" { style.font-size: 22 }
+iam -> genai: "allow" { style.font-size: 22 }
+genai -> core: "completion with <tool_call> text" { style.font-size: 22 }
+core -> tools: "parsed tool call" { style.stroke-dash: 3; style.font-size: 22 }
+tools -> core: "tool result" { style.stroke-dash: 3; style.font-size: 22 }
+core -> genai: "next model call … until the final answer" { style.font-size: 22 }
+genai -> core: "answer" { style.font-size: 22 }
+core -> lb: "JSON-RPC result" { style.font-size: 22 }
+lb -> laptop: "200" { style.font-size: 22 }
