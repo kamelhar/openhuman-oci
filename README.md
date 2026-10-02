@@ -155,6 +155,7 @@ Short version; details and evidence in [`docs/PILOT.md`](docs/PILOT.md).
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Reference design: deployment shapes, OCI service mapping, security posture, egress, phased plan |
 | [`docs/PILOT.md`](docs/PILOT.md) | What was built, decisions, results, current state, operating notes |
 | [`docs/PILOT-ACCOUNT-VALIDATION.md`](docs/PILOT-ACCOUNT-VALIDATION.md) | Read-only check that the pilot fits a personal account on Always Free |
+| [`docs/usecases/alzheimers-trial-landscape.md`](docs/usecases/alzheimers-trial-landscape.md) | The showcase use case: 4,300 public Alzheimer's trials in the database, governed SQL via MCP, sub-agent web research, deep dives, memory |
 | [`docs/UPSTREAM.md`](docs/UPSTREAM.md) | What from here can go into OpenHuman, where, and under which rules |
 | [`AGENTS.md`](AGENTS.md) | The codex: purpose, order of operations, invariants and prohibitions for coding agents (Codex, Claude Code) and operators |
 | [`deploy/terraform/`](deploy/terraform) | The stack. One root module, variables documented in `variables.tf` |
