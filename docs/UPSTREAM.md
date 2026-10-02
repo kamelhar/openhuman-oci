@@ -16,6 +16,18 @@ build with CI), [#5444](https://github.com/tinyhumansai/openhuman/issues/5444)
 (desktop client to remote headless core), [#5199](https://github.com/tinyhumansai/openhuman/issues/5199)
 (slim and headless dependency profiles). Comment there before opening new ones.
 
+## Status (2026-10-02)
+
+| Item | Upstream | State |
+| --- | --- | --- |
+| Compose: writable projects volume under `read_only` | issue [#6925](https://github.com/tinyhumansai/openhuman/issues/6925), PR [#6928](https://github.com/tinyhumansai/openhuman/pull/6928) | open |
+| Docs: glibc floor, headless without account, container keyring, OCI recipe | issue [#6927](https://github.com/tinyhumansai/openhuman/issues/6927), PR [#6929](https://github.com/tinyhumansai/openhuman/pull/6929) | open |
+| Keyring master key injection for headless (`OPENHUMAN_KEYRING_MASTER_KEY`) | issue [#6926](https://github.com/tinyhumansai/openhuman/issues/6926) | open, Rust PR next if maintainers agree |
+| BYOK without a TinyHumans session | comment on [#6601](https://github.com/tinyhumansai/openhuman/issues/6601#issuecomment-5952668753) with evidence and a minimal proposal | awaiting maintainer |
+| OCI GenAI provider preset, native embeddings | not filed | after the above land |
+
+Fork: `fede-kamel/openhuman`. Branches: `fix/compose-projects-volume`, `docs/headless-deploy-gaps`.
+
 ## Where each piece lands
 
 | Contribution | Repo | Where | Precedent |

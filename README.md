@@ -27,6 +27,31 @@ repository answers two questions nobody had answered yet:
 The pattern is harness-neutral. Swap OpenHuman for any OpenAI-compatible agent
 harness and the OCI side stays the same.
 
+## The user story
+
+> As an engineer whose company runs on Oracle Database, I want a personal AI
+> agent that works over my own notes, mail and code **and** answers questions
+> from our Oracle data in plain language, keeps working when my laptop is
+> closed, and does all of it inside our OCI tenancy with database access
+> governed by our IAM roles, so that I stop pasting company data into a public
+> chatbot and stop keeping database wallets on laptops.
+
+Definition of done, and where the pilot stands:
+
+| Criterion | Status |
+| --- | --- |
+| Inference never leaves our cloud | done: OCI Generative AI via the OpenAI-compatible endpoint |
+| No third-party account required | done: session-free `local-openai` mode |
+| Agent reaches Oracle data only through governed access | built: managed Database Tools MCP Server, IAM policy, app role; waiting for the user token |
+| Answers are remembered | done: memory tree with local embeddings |
+| Always on | done: headless core on an Always Free VM |
+| One command to build, one to tear down | done: `terraform apply` / `destroy` |
+| Fits a personal account | done: everything Always Free except GenAI tokens |
+
+Two supporting stories ride on the same stack: a platform engineer who wants
+one governed way for *any* agent harness to reach Oracle Database, and an
+advocate who needs a live, reproducible demo of OCI for agents.
+
 ## What gets built
 
 ```mermaid
@@ -113,6 +138,7 @@ Short version; details and evidence in [`docs/PILOT.md`](docs/PILOT.md).
 | [`docs/PILOT.md`](docs/PILOT.md) | What was built, decisions, results, current state, operating notes |
 | [`docs/PILOT-ACCOUNT-VALIDATION.md`](docs/PILOT-ACCOUNT-VALIDATION.md) | Read-only check that the pilot fits a personal account on Always Free |
 | [`docs/UPSTREAM.md`](docs/UPSTREAM.md) | What from here can go into OpenHuman, where, and under which rules |
+| [`AGENTS.md`](AGENTS.md) | The codex: purpose, order of operations, invariants and prohibitions for coding agents (Codex, Claude Code) and operators |
 | [`deploy/terraform/`](deploy/terraform) | The stack. One root module, variables documented in `variables.tf` |
 | [`deploy/vm/`](deploy/vm) | Fetched by the VM at boot: core Dockerfile, compose file, secret and settings renderer, systemd units |
 | [`deploy/scripts/`](deploy/scripts) | Steps Terraform cannot do: GenAI key, CA trust, MCP token, demo data |
@@ -122,7 +148,7 @@ Short version; details and evidence in [`docs/PILOT.md`](docs/PILOT.md).
 | Phase | State |
 | --- | --- |
 | 1. Always Free pilot on one VM | deployed, see `docs/PILOT.md` |
-| 2. Upstream contributions (release-based arm64 image, headless keyring key, boot-time BYOK env, OCI provider preset) | mapped in `docs/UPSTREAM.md` |
+| 2. Upstream contributions | started: issues #6925, #6926, #6927 and PRs #6928, #6929 open on tinyhumansai/openhuman; tracker in `docs/UPSTREAM.md` |
 | 3. OKE variant with one core per user and an in-tenancy inference gateway | designed in `docs/ARCHITECTURE.md`, not started |
 | 4. Sovereign build on `openhuman-embed` with no TinyHumans backend | designed, not started |
 
