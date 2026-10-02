@@ -2,12 +2,12 @@
 # Scripted showcase for recording. Talks to the deployed core through the load
 # balancer only. Secrets are read from Vault at runtime and never printed.
 # Usage: deploy/scripts/demo.sh            (set DEMO_FAST=1 to skip pauses)
+export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"   # recorders start a bare shell
 source "$(dirname "$0")/lib.sh"
 ROOT="$(cd "$HERE/../.." && pwd)"
-LB="$(tfout lb_public_ip)"; CA="$(mktemp)"; tfout lb_ca_certificate_pem > "$CA"
-TOKEN=$(oci secrets secret-bundle get --secret-id "$(tfjson secret_ids | jq -r .core_token)" \
-  --profile "$PROFILE" --region "$HOME_REGION" --query 'data."secret-bundle-content".content' --raw-output | base64 -d)
-MODEL="$(tfjson genai | jq -r .chat_model)"
+# Defaults for recording: tool-call evidence via the bastion tunnel if it is up, timing file for trimming.
+if [ -z "${DEMO_SSH_PORT:-}" ] && nc -z 127.0.0.1 2222 2>/dev/null; then DEMO_SSH_PORT=2222; fi
+DEMO_TIMING_FILE="${DEMO_TIMING_FILE:-$ROOT/media/.demo-elapsed}"
 B=$'\e[1m'; D=$'\e[2m'; G=$'\e[32m'; C=$'\e[36m'; Y=$'\e[33m'; R=$'\e[0m'
 pause() { [ -n "${DEMO_FAST:-}" ] || sleep "${1:-2}"; }
 say()   { printf "\n%s%s%s\n" "$B$C" "$*" "$R"; }
@@ -33,9 +33,16 @@ turn()  { # $1 thread  $2 shown prompt  $3 full instruction  [$4 expected regex]
   dim "⏱ $((SECONDS - t0))s · $MODEL via OCI Generative AI · SearXNG · Playwright MCP · memory$(evidence)"
 }
 
+DEMO_T0=$SECONDS
 clear
 say "OpenHuman on OCI · headless personal agent · no vendor account"
-cat "$ROOT/media/architecture.txt"; pause 6
+cat "$ROOT/media/architecture.txt"
+# fetch endpoint, CA and token while the viewer reads the diagram
+LB="$(tfout lb_public_ip)"; CA="$(mktemp)"; tfout lb_ca_certificate_pem > "$CA"
+TOKEN=$(oci secrets secret-bundle get --secret-id "$(tfjson secret_ids | jq -r .core_token)" \
+  --profile "$PROFILE" --region "$HOME_REGION" --query 'data."secret-bundle-content".content' --raw-output | base64 -d)
+MODEL="$(tfjson genai | jq -r .chat_model)"
+pause 3
 
 say "1 · The edge: only three paths reach the core, and only with the bearer token"
 printf "GET  /health            → "; curl -s --cacert "$CA" -o /dev/null -w "%{http_code}\n" "https://$LB/health"
@@ -85,4 +92,5 @@ else
 fi
 pause 2
 say "DEMO_DONE · github.com/kamelhar/openhuman-oci"
+[ -n "${DEMO_TIMING_FILE:-}" ] && echo $((SECONDS - DEMO_T0)) > "$DEMO_TIMING_FILE"
 rm -f "$CA"; unset TOKEN

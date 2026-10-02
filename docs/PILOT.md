@@ -70,6 +70,16 @@ background indexer has not produced yet; the periodic memory sync runs every
 showcase script therefore tries the agent's recall first and falls back to
 reading the stored note through the RPC. Open question for upstream.
 
+## Showcase video (2026-10-02)
+
+`media/openhuman-oci-showcase.mp4` (71 s, 1600x1000): title card, the scripted
+terminal session against the live deployment (edge checks, browser navigation,
+research with memory write, memory read-back, MCP server status), the page the
+headless browser saw, and an outro. Produced by `deploy/scripts/demo.sh` under
+`vhs media/demo.tape`, then `media/assemble.sh`. The agent model for the
+recording is gpt-4.1 at temperature 0.2; the gpt-5 family is unusable on the
+`local-openai` route today because the runtime sends `max_tokens`.
+
 ## Current state
 
 | Item | State |

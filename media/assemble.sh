@@ -4,6 +4,13 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 for f in title.mp4 demo.mp4 browser-card.mp4 outro.mp4; do [ -f "$f" ] || { echo "missing $f" >&2; exit 1; }; done
+# trim the terminal capture to what the demo actually took (+ typing and a tail), using the
+# elapsed seconds the demo wrote; fall back to the full capture.
+LEAD="${DEMO_LEAD_TRIM:-3}"   # seconds of typing/blank at the start to drop
+if [ -f .demo-elapsed ]; then
+  DUR=$(( $(cat .demo-elapsed) + 12 ))
+  ffmpeg -y -loglevel error -ss "$LEAD" -i demo.mp4 -t "$DUR" -c:v libx264 -preset veryfast -crf 20 -an _demo-trim.mp4 && mv _demo-trim.mp4 demo.mp4
+fi
 # normalise every segment to the same size/fps/pixel format before concat
 for f in title demo browser-card outro; do
   ffmpeg -y -loglevel error -i "$f.mp4" -vf "scale=1600:1000:force_original_aspect_ratio=decrease,pad=1600:1000:(ow-iw)/2:(oh-ih)/2:color=0x1e1e2e,fps=30,format=yuv420p" -an -c:v libx264 -preset veryfast -crf 20 "_$f.mp4"
