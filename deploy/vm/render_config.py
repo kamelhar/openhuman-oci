@@ -121,6 +121,46 @@ def register_mcp(secrets, cfg, state, core_token):
         print(f"MCP registration failed: {e}")
 
 
+RESEARCHER = {
+    "id": "researcher",
+    "name": "Web researcher",
+    "description": "Use for focused web research on one topic, company, drug or trial: it searches, reads 2-3 authoritative pages and returns verified facts with source URLs.",
+    "enabled": True,
+    "system_prompt": ("You are a careful research sub-agent. For the topic you are given: call web_search_tool, then web_fetch "
+                      "the 2-3 most authoritative pages (prefer official sites, regulators, peer-reviewed or major news; skip pages "
+                      "that return 403). Return 3-5 verified facts as bullets, each ending with its source URL. Never invent facts or "
+                      "URLs. Execute tool calls immediately, one tool call per message; do not narrate."),
+    "tool_allowlist": ["web_search_tool", "web_fetch", "tool_search"],
+    "tool_denylist": ["shell", "apply_patch", "spawn_async_subagent", "spawn_parallel_agents"],
+    "tags": ["research", "demo"],
+    "metadata": {"created_by": "openhuman-oci renderer"},
+}
+
+
+def ensure_agents(state, core_token):
+    """Register the researcher sub-agent and let the orchestrator delegate to it."""
+    fp = hashlib.sha256(json.dumps(RESEARCHER, sort_keys=True).encode()).hexdigest()
+    if state.get("agents_hash") == fp:
+        return
+    try:
+        try:
+            rpc("openhuman.agent_registry_create_custom", RESEARCHER, core_token)
+        except Exception as e:
+            if "exists" not in str(e).lower():
+                rpc("openhuman.agent_registry_update", RESEARCHER, core_token)
+        orch = rpc("openhuman.agent_registry_get", {"id": "orchestrator"}, core_token) or {}
+        agent = orch.get("agent", orch)
+        allow = list(((agent.get("subagents") or {}).get("allowlist")) or [])
+        if "researcher" not in allow:
+            allow.append("researcher")
+            rpc("openhuman.agent_registry_update", {"id": "orchestrator", "subagents": {"allowlist": allow}}, core_token)
+        state["agents_hash"] = fp
+        save_state(state)
+        print("agents ensured: researcher registered and allowed for the orchestrator")
+    except Exception as e:
+        print(f"agent registry update failed: {e}")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--no-restart", action="store_true")
@@ -175,6 +215,7 @@ def main():
 
     if core_healthy():
         register_mcp(secrets, cfg, state, core_token)
+        ensure_agents(state, core_token)
 
     if genai_key in ("", "PENDING"):
         print("GenAI API key not yet in Vault; skipping model settings")

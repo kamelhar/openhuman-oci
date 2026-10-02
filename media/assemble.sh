@@ -8,7 +8,7 @@ for f in title.mp4 demo.mp4 browser-card.mp4 outro.mp4; do [ -f "$f" ] || { echo
 # elapsed seconds the demo wrote; fall back to the full capture.
 LEAD="${DEMO_LEAD_TRIM:-3}"   # seconds of typing/blank at the start to drop
 if [ -f .demo-elapsed ]; then
-  DUR=$(( $(cat .demo-elapsed) + 12 ))
+  DUR=$(( $(cat .demo-elapsed) + 14 ))
   ffmpeg -y -loglevel error -ss "$LEAD" -i demo.mp4 -t "$DUR" -c:v libx264 -preset veryfast -crf 20 -an _demo-trim.mp4 && mv _demo-trim.mp4 demo.mp4
 fi
 # normalise every segment to the same size/fps/pixel format before concat

@@ -80,6 +80,20 @@ headless browser saw, and an outro. Produced by `deploy/scripts/demo.sh` under
 recording is gpt-4.1 at temperature 0.2; the gpt-5 family is unusable on the
 `local-openai` route today because the runtime sends `max_tokens`.
 
+### Sub-agents and tool dialect (2026-10-02)
+
+- `spawn_async_subagent` / `spawn_parallel_agents` only accept agent ids in the
+  orchestrator's `subagents.allowlist`; registering a custom agent is not
+  enough. The renderer now registers a `researcher` agent and appends it to the
+  allowlist with `openhuman.agent_registry_update`.
+- Every local runtime profile (`ollama`, `lmstudio`, `mlx`, `omlx`,
+  `local-openai`) is `ToolSupport::PromptGuided`; there is no native
+  function-calling path without a TinyHumans session. Prompts that put several
+  tool calls in one message can leak as text. Mitigations: one call per
+  message, numbered steps, temperature 0.2, one retry.
+- OCI's OpenAI-compatible endpoint caps `tool_call_id` at 64 characters; the
+  harness mints 69. Four rejected turns in a day. Filed upstream as #6933.
+
 ## Current state
 
 | Item | State |
