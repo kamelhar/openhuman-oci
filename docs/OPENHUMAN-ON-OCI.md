@@ -18,7 +18,7 @@ This document describes how we ran that core on Oracle Cloud Infrastructure (OCI
 
 Everything is expressed in Terraform (56 resources in one root module) plus a boot script on the VM; `terraform apply` builds it in about twenty minutes and `terraform destroy` removes it, compartment included. The deployment was validated end to end on 2026-10-01 and 2026-10-02 against a personal pay-as-you-go tenancy, and two recorded sessions show it working: a 132-second tour of the platform and a 145-second clinical-research scenario in which the agent analyses 4,300 public Alzheimer's disease trials in the database, researches the leading sponsors on the live web with parallel sub-agents, writes a sourced brief on an approved drug from FDA pages, and reads it back from memory.
 
-The work also produced eleven upstream findings, five of them filed as issues and two as pull requests on the OpenHuman repository, because the pattern is harness-neutral: swap OpenHuman for any OpenAI-compatible agent harness that speaks the Model Context Protocol (MCP) and the OCI side does not change.
+The work also produced nine upstream findings, five of them filed as issues and three as pull requests on the OpenHuman repository, because the pattern is harness-neutral: swap OpenHuman for any OpenAI-compatible agent harness that speaks the Model Context Protocol (MCP) and the OCI side does not change.
 
 ---
 
@@ -229,7 +229,7 @@ Two choices here came from failures.
 
 The VM never receives a secret at creation. `render_config.py`, run by a systemd timer every two minutes, authenticates to Vault with the instance principal, reads the five secrets, writes the core's environment file, restarts the core only when that file changed, and then pushes the agent's settings through the core's own JSON-RPC. That last step exists because of a finding about the core.
 
-**Headless keyring.** In production mode the core stores provider keys with an `encrypted_file` keyring whose master key it loads from the operating system keychain. A container has no keychain, the core logs `master key unavailable — cannot store secrets`, and the first settings write fails with `Failed to encrypt api_key`. Upstream has no way to inject that master key. The pilot runs `OPENHUMAN_KEYRING_BACKEND=file`, which keeps the provider key in a plaintext JSON file on the block volume (encrypted at rest by OCI, mode 0600, private subnet). Issue #6926 asks for an environment-variable master key; until then the VM is the secret boundary and the security section says so.
+**Headless keyring.** In production mode the core stores provider keys with an `encrypted_file` keyring whose master key it loads from the operating system keychain. A container has no keychain, the core logs `master key unavailable — cannot store secrets`, and the first settings write fails with `Failed to encrypt api_key`. Upstream has no way to inject that master key. The pilot runs `OPENHUMAN_KEYRING_BACKEND=file`, which keeps the provider key in a plaintext JSON file on the block volume (encrypted at rest by OCI, mode 0600, private subnet). Issue #6926 asks for an environment-variable master key and PR #6935 implements it (`OPENHUMAN_KEYRING_MASTER_KEY` or a key file); until it ships, the VM is the secret boundary and the security section says so.
 
 **BYOK is completed by the core, not by a file.** Hand-writing an `inference_url` and `api_key` into the core's TOML does not route: the core only completes a custom-provider route (registers the provider, pins the roles) inside its settings-update RPC. The renderer therefore calls `openhuman.config_update_model_settings` and `openhuman.config_update_local_ai_settings` rather than editing TOML, and keeps a hash of what it pushed so the calls are idempotent.
 
@@ -365,7 +365,7 @@ A log group with the Database Tools MCP server's `invoke` service log is part of
 | MCP user token | `03-register-mcp.sh` (placeholder from Terraform) | Renderer, then the core's `oracle-db` MCP header | Generate a new token, re-run the script |
 | TinyHumans API key | Optional Terraform variable | Only in `byok-cloud` mode | Terraform |
 
-Terraform state contains the generated values and must be treated as a secret. Inside the core, provider keys sit in the file keyring on the encrypted block volume until upstream accepts a master-key injection (issue #6926).
+Terraform state contains the generated values and must be treated as a secret. Inside the core, provider keys sit in the file keyring on the encrypted block volume until upstream merges the master-key injection (issue #6926, PR #6935).
 
 ---
 
@@ -433,7 +433,7 @@ The demo driver encodes all five. The full prompt set is in the repository.
 
 **Not exposed.** The VM (no public IP), the database (VCN access list, private-endpoint path), SearXNG and the browser (compose network only; a browser that any client could drive is a proxy into the tenancy), Vault, the MCP server (public endpoint, but IAM plus app roles plus a user token).
 
-**Residual risks, stated.** Provider keys in the file keyring on the VM until #6926; the core token as a single credential for full control of one user's core; the browser is a general-purpose web client under the agent's control, which is why it runs `--isolated` and why the agent's sandbox tier for file and shell tools should stay at read-only or supervised for database-facing work; the agent's textual tool dialect, which can be steered by prompt injection in fetched pages, is screened by the core's prompt-injection scanner but is a reason to keep `tool_allowlist`s tight on sub-agents.
+**Residual risks, stated.** Provider keys in the file keyring on the VM until PR #6935 lands; the core token as a single credential for full control of one user's core; the browser is a general-purpose web client under the agent's control, which is why it runs `--isolated` and why the agent's sandbox tier for file and shell tools should stay at read-only or supervised for database-facing work; the agent's textual tool dialect, which can be steered by prompt injection in fetched pages, is screened by the core's prompt-injection scanner but is a reason to keep `tool_allowlist`s tight on sub-agents.
 
 **Data classification.** The clinical dataset is public registry metadata. Protected health information must never enter this system; the use case was chosen to make that true structurally, not by instruction.
 
@@ -479,7 +479,7 @@ Everything the deployment found that belongs to OpenHuman rather than to this re
 | --- | --- | --- |
 | Compose `read_only` root leaves the agent projects directory uncreatable | [#6925](https://github.com/tinyhumansai/openhuman/issues/6925), PR [#6928](https://github.com/tinyhumansai/openhuman/pull/6928) | Open |
 | Docs: glibc floor of release tarballs, headless without an account, container keyring, OCI recipe | [#6927](https://github.com/tinyhumansai/openhuman/issues/6927), PR [#6929](https://github.com/tinyhumansai/openhuman/pull/6929) | Open |
-| Headless keyring master key cannot be injected | [#6926](https://github.com/tinyhumansai/openhuman/issues/6926) | Open; Rust change proposed |
+| Headless keyring master key cannot be injected | [#6926](https://github.com/tinyhumansai/openhuman/issues/6926), PR [#6935](https://github.com/tinyhumansai/openhuman/pull/6935) | Open; 15 backend tests, env var or key file |
 | Tool-call ids exceed the 64-character cap OpenAI-compatible endpoints enforce | [#6933](https://github.com/tinyhumansai/openhuman/issues/6933) | Open; fix belongs in the tinyagents `CallId` |
 | Orchestrator sub-agent allowlist update never reaches the spawn tool | [#6934](https://github.com/tinyhumansai/openhuman/issues/6934) | Open |
 | Custom cloud providers gated behind a session in headless mode | Comment on [#6601](https://github.com/tinyhumansai/openhuman/issues/6601) | Awaiting maintainers |
