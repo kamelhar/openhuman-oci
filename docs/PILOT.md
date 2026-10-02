@@ -34,12 +34,37 @@ worked, what had to change, and what was learned:
 | MCP server auth | A client-credentials OAuth client (created in Terraform) gets a valid token for the MCP audience, but IAM evaluates it as principal type `user` with the domain-app OCID and no policy form authorizes it (`request.principal.id`, `request.user.id`, even an unconditional any-user grant). The MCP invoke service log names the missing permission. Supported shapes are user tokens: personal access token, OAuth sign-in, or a trusted client acting on behalf of a user. The pilot stores a personal access token in Vault and the VM registers the server from there |
 | Embeddings | Ollama `bge-m3` on the VM, 1024 dimensions, reachable from the core container |
 
+## Research stack (2026-10-02)
+
+Two containers were added next to the core so the agent can research without a
+TinyHumans account:
+
+| Capability | How | Verified |
+| --- | --- | --- |
+| Web search | SearXNG container (`searxng/searxng`, JSON output enabled), wired with `OPENHUMAN_SEARXNG_ENABLED` / `OPENHUMAN_SEARXNG_BASE_URL`. The core's search role resolves to `searxng` with no fallbacks | `openhuman.tools_web_search` returned Oracle docs as citations; agent turns show `tool_calls` for search |
+| Page reading | Built-in `web_fetch` (HTML to Markdown through tinyjuice), no key | Used in research turns |
+| Web navigation | Playwright MCP container (`mcr.microsoft.com/playwright/mcp`, headless Chromium, `--isolated`, streamable HTTP on the compose network). Registered in the core as the `browser` MCP server by the renderer; 25 `browser_*` tools | Agent navigated to oracle.com/mcp, snapshotted the page and listed the seven Oracle MCP servers correctly |
+| Memory | `memory_store` / `memory_recall` tools over the memory tree with Ollama embeddings | `MEMORY_SAVED` in the showcase turn; facts land in the `global` namespace |
+
+Showcase turn (`openhuman.inference_agent_chat`, model `openai.gpt-4.1` through
+OCI GenAI): browser navigate and snapshot, web search, `web_fetch` of an Oracle
+doc, `memory_store`, then a 200-word brief citing only the two pages it opened.
+27 seconds, 8 model calls, 8 tool calls.
+
+Two things to know. MCP tools are *deferred*: the model has to call
+`tool_search` before a `browser_*` tool is in view, which it does when the task
+says "open ... in the browser"; a config-side `direct_tools` list exists for
+servers declared in `config.toml` but not for the registry path the renderer
+uses. And the `local-openai` runtime is `PromptGuided` for tool calling (textual
+dialect, not native function calling); it worked reliably with gpt-4.1 in every
+run, but an unloaded tool name can leak into the reply as text.
+
 ## Current state
 
 | Item | State |
 | --- | --- |
 | Terraform | Clean plan after the fix-up applies. Everything in one compartment, `terraform destroy` removes it all |
-| Core | Healthy, answering through OCI GenAI (`local-openai` mode), Ollama embeddings available |
+| Core | Healthy, answering through OCI GenAI (`local-openai` mode), Ollama embeddings, SearXNG search, Playwright browser |
 | Database | Autonomous AI Database 26ai Always Free, `ORDERS` demo table seeded from the VM |
 | MCP | Database Tools MCP Server created, MCP_Operator granted to the users group, waiting for a personal access token in Vault (`deploy/scripts/03-register-mcp.sh`) |
 | Client | Desktop app connects with the LB URL and the core token after trusting the generated CA (`deploy/scripts/02-trust-lb-cert.sh`) |

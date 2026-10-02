@@ -38,7 +38,8 @@ answers remembered, always on, one `terraform apply`, Always Free footprint.
 | `deploy/terraform/templates/cloud-init.yaml.tftpl` | Writes `/opt/openhuman/bootstrap.env` on the VM and runs `bootstrap.sh` | New VM-side setting |
 | `deploy/vm/bootstrap.sh` | Idempotent first boot: volume, Docker, assets, image, compose, timer | VM runtime change |
 | `deploy/vm/Dockerfile.core` | Runtime image around the upstream release tarball (Ubuntu 24.04, glibc 2.39) | New upstream release shape |
-| `deploy/vm/compose.yaml` | Core + Ollama. Core reads `/opt/openhuman/core.env` | Container change |
+| `deploy/vm/compose.yaml` | Core, Ollama (embeddings), SearXNG (search), Playwright MCP (browser). Only the core publishes a port | Container change |
+| `deploy/vm/searxng-settings.yml` | SearXNG template; the secret key is generated on the VM at first boot | Search settings |
 | `deploy/vm/render_config.py` | Every 2 min: Vault secrets to `core.env`, settings and MCP registration via RPC | Settings or secret flow change |
 | `deploy/scripts/` | Operator steps Terraform cannot do | Manual step change |
 | `docs/ARCHITECTURE.md` | Design and alternatives | Design change |
@@ -79,6 +80,8 @@ The VM downloads `deploy/vm/*` from this repository's `main` at boot
   `ignore_changes`, documented inline.
 - Everything is destroyable with `terraform destroy`; the compartment has
   `enable_delete`.
+- SearXNG and Playwright MCP are reachable only on the compose network. Never
+  publish their ports; the browser can be driven to arbitrary sites.
 
 ## Never
 

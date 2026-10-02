@@ -64,6 +64,8 @@ flowchart LR
     subgraph vm[Ampere A1 VM, private subnet]
       core[openhuman-core<br/>container]
       ollama[Ollama bge-m3<br/>embeddings]
+      searx[SearXNG<br/>web search]
+      pw[Playwright MCP<br/>headless Chromium]
     end
     vault[(Vault<br/>core token, GenAI key,<br/>DB password, MCP token)]
     mcp[Database Tools<br/>MCP Server]
@@ -76,6 +78,8 @@ flowchart LR
   genai[OCI Generative AI<br/>OpenAI-compatible endpoint]
   app -- HTTPS + bearer --> lb --> core
   core --> ollama
+  core --> searx
+  core -- MCP --> pw
   core -. instance principal .-> vault
   core -- "local-openai runtime<br/>GenAI API key" --> nat --> genai
   core -- "streamable HTTP MCP<br/>user token" --> mcp --> pe --> sgw --> adb
@@ -87,11 +91,14 @@ flowchart LR
 | Network | VCN, public and private subnets, internet/NAT/service gateways, three NSGs | free |
 | Compute | Ampere A1 VM (3 OCPU, 18 GB, Ubuntu 24.04), 50 GB boot, 50 GB workspace volume | free (Always Free allowance) |
 | Core | Upstream `openhuman-core` release binary in a container, Ollama for embeddings, systemd timer that renders secrets and settings | free |
+| Research | SearXNG container for web search, Playwright MCP container for headless browser navigation, built-in page reader; all private to the compose network | free |
 | Inference | OCI Generative AI via the OpenAI-compatible endpoint, API key in Vault | per token |
 | Database | Autonomous AI Database 26ai, TLS without wallet, access list = VCN + your IP | free |
 | Agent to DB | Database Tools private endpoint, connection, managed MCP Server, identity-domain group with the MCP_Operator role | free |
 | Edge | Reserved public IP, flexible load balancer, generated CA and certificate, path allowlist | free |
 | Ops | Vault with five secrets, Bastion, log group with the MCP invoke service log | free |
+
+Once up, a single agent turn can navigate a live page in the headless browser, search the web through SearXNG, read Oracle docs, and store what it learned in memory; see the showcase in `docs/PILOT.md`.
 
 A full apply is about 55 resources and 20 minutes. `terraform destroy` removes
 everything, including the compartment.
@@ -129,6 +136,7 @@ Short version; details and evidence in [`docs/PILOT.md`](docs/PILOT.md).
 - Custom cloud providers are gated behind a TinyHumans session; caller-owned runtimes are not. OCI GenAI runs as the `local-openai` runtime.
 - OCI load balancers cannot filter paths in ALLOW rules; the allowlist is a path route set with an empty default backend.
 - A Terraform-made OAuth client gets a valid token for the MCP server, yet IAM cannot authorize it as a principal. The invoke service log is the only place that names the missing permission.
+- Web search and browser navigation need no vendor account either: SearXNG and Playwright MCP run as containers beside the core, and MCP tools are loaded through `tool_search` on demand.
 
 ## Repository layout
 
