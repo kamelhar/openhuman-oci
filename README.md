@@ -56,7 +56,7 @@ advocate who needs a live, reproducible demo of OCI for agents.
 
 [![OpenHuman on OCI showcase](media/title.png)](media/openhuman-oci-showcase.mp4)
 
-One scripted session against the live deployment: the edge checks, a headless
+One scripted session against the live deployment, paced for reading (about two minutes): the edge checks, a headless
 browser drive to oracle.com/mcp, a web research turn that stores its findings
 in memory, and the memory answering later without the web. Recorded with
 `media/demo.tape` (VHS) driving `deploy/scripts/demo.sh`; the title, screenshot

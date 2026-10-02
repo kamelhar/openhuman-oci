@@ -72,7 +72,7 @@ reading the stored note through the RPC. Open question for upstream.
 
 ## Showcase video (2026-10-02)
 
-`media/openhuman-oci-showcase.mp4` (71 s, 1600x1000): title card, the scripted
+`media/openhuman-oci-showcase.mp4` (132 s, 1600x1000, paced for reading: line-by-line reveals, longer holds): title card, the scripted
 terminal session against the live deployment (edge checks, browser navigation,
 research with memory write, memory read-back, MCP server status), the page the
 headless browser saw, and an outro. Produced by `deploy/scripts/demo.sh` under
