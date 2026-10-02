@@ -89,24 +89,34 @@ def schema_methods():
         return set()
 
 
+BROWSER_MCP_URL = "http://playwright-mcp:8931/mcp"
+
+
 def register_mcp(secrets, cfg, state, core_token):
-    """Declare the Database Tools MCP Server in the core once a user token is in Vault."""
-    token = secret_value(secrets, cfg["SECRET_MCP_USER_TOKEN"])
-    if token in ("", "PENDING"):
-        return
-    fp = hashlib.sha256((token + cfg["MCP_ENDPOINT"]).encode()).hexdigest()
+    """Declare the core's MCP servers: the headless browser always, the Database
+    Tools MCP Server once a user token is in Vault. config_set replaces the whole
+    document, so both are sent together."""
+    servers = {"browser": {
+        "url": BROWSER_MCP_URL,
+        "description": "Headless Chromium via Playwright MCP: navigate, click, type, read pages, screenshots",
+    }}
+    token = ""
+    if cfg.get("SECRET_MCP_USER_TOKEN"):
+        token = secret_value(secrets, cfg["SECRET_MCP_USER_TOKEN"])
+    if token not in ("", "PENDING") and cfg.get("MCP_ENDPOINT"):
+        servers["oracle-db"] = {
+            "url": cfg["MCP_ENDPOINT"],
+            "headers": {"Authorization": f"Bearer {token}"},
+            "description": "Oracle AI Database via the OCI Database Tools MCP Server",
+        }
+    fp = hashlib.sha256(json.dumps(servers, sort_keys=True).encode()).hexdigest()
     if state.get("mcp_hash") == fp:
         return
-    doc = {"mcpServers": {"oracle-db": {
-        "url": cfg["MCP_ENDPOINT"],
-        "headers": {"Authorization": f"Bearer {token}"},
-        "description": "Oracle AI Database via the OCI Database Tools MCP Server",
-    }}}
     try:
-        rpc(MCP_CONFIG_METHOD, doc, core_token)
+        rpc(MCP_CONFIG_METHOD, {"mcpServers": servers}, core_token)
         state["mcp_hash"] = fp
         save_state(state)
-        print("MCP server registered in the core")
+        print(f"MCP servers registered: {sorted(servers)}")
     except Exception as e:
         print(f"MCP registration failed: {e}")
 
@@ -138,6 +148,9 @@ def main():
         # local-openai mode: the core treats OCI GenAI's OpenAI-compatible endpoint
         # as a caller-owned runtime, which needs no TinyHumans session.
         f"LOCAL_OPENAI_URL={cfg['GENAI_INFERENCE_URL']}",
+        # Web search through the SearXNG container (no provider key needed).
+        "OPENHUMAN_SEARXNG_ENABLED=true",
+        "OPENHUMAN_SEARXNG_BASE_URL=http://searxng:8080",
         "RUST_LOG=info",
     ]
     if th_key and th_key != "NONE":
@@ -160,7 +173,7 @@ def main():
                     break
                 time.sleep(5)
 
-    if cfg.get("SECRET_MCP_USER_TOKEN") and cfg.get("MCP_ENDPOINT") and core_healthy():
+    if core_healthy():
         register_mcp(secrets, cfg, state, core_token)
 
     if genai_key in ("", "PENDING"):

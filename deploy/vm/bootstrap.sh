@@ -41,9 +41,14 @@ if ! iptables -C INPUT -p tcp --dport 7788 -j ACCEPT 2>/dev/null; then
 fi
 
 # ---- assets ------------------------------------------------------------------
-for f in Dockerfile.core compose.yaml render_config.py openhuman-render.service openhuman-render.timer; do
+for f in Dockerfile.core compose.yaml render_config.py openhuman-render.service openhuman-render.timer searxng-settings.yml; do
   curl -fsSL "$ASSETS_BASE_URL/$f" -o "$BASE/$f"
 done
+# SearXNG config with a per-host secret key (never committed).
+mkdir -p "$BASE/searxng"
+if [ ! -f "$BASE/searxng/settings.yml" ]; then
+  sed "s/replaced-at-boot/$(openssl rand -hex 32)/" "$BASE/searxng-settings.yml" > "$BASE/searxng/settings.yml"
+fi
 
 # ---- python env for the secret/config renderer ------------------------------
 if [ ! -x "$BASE/venv/bin/python" ]; then

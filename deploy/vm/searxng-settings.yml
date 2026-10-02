@@ -1,0 +1,15 @@
+# SearXNG settings for the OpenHuman core. JSON output must be enabled for the
+# core's searxng_search tool. Everything else stays at SearXNG defaults.
+use_default_settings: true
+server:
+  secret_key: "replaced-at-boot"
+  limiter: false
+  image_proxy: false
+search:
+  formats:
+    - html
+    - json
+  safe_search: 0
+  autocomplete: ""
+ui:
+  static_use_hash: true

@@ -27,6 +27,8 @@ services:
     cpus: 2.0
     depends_on:
       - ollama
+      - searxng
+      - playwright-mcp
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:7788/health"]
       interval: 30s
@@ -40,4 +42,30 @@ services:
     volumes:
       - /opt/openhuman/data/ollama:/root/.ollama
     mem_limit: 6g
+    cpus: 1.0
+
+  # Self-hosted web search for the agent (searxng_search / web_search_tool).
+  # Not published on the host; the core reaches it on the compose network.
+  searxng:
+    image: searxng/searxng:latest
+    container_name: searxng
+    restart: unless-stopped
+    volumes:
+      - /opt/openhuman/searxng:/etc/searxng
+    environment:
+      SEARXNG_BASE_URL: http://searxng:8080/
+    mem_limit: 1g
+    cpus: 0.5
+
+  # Headless browser for web navigation, exposed to the core as an MCP server
+  # over streamable HTTP (http://playwright-mcp:8931/mcp). Not published on the host.
+  playwright-mcp:
+    image: mcr.microsoft.com/playwright/mcp:latest
+    container_name: playwright-mcp
+    restart: unless-stopped
+    init: true
+    entrypoint: ["node", "/app/cli.js"]
+    command: ["--headless", "--browser", "chromium", "--no-sandbox", "--isolated", "--port", "8931", "--host", "0.0.0.0", "--allowed-hosts", "playwright-mcp,playwright-mcp:8931,localhost,127.0.0.1"]
+    shm_size: 1g
+    mem_limit: 2g
     cpus: 1.0
